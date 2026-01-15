@@ -1,6 +1,6 @@
 //! `GeneratorReference` type for generated media content.
 
-use crate::{ffi, is_unset_time_range, macros, traits, TimeRange};
+use crate::{ffi, is_unset_time_range, macros, time_range_from_ffi, traits, TimeRange};
 use std::ffi::CString;
 
 /// Common generator kinds.
@@ -89,10 +89,7 @@ impl GeneratorReference {
         if is_unset_time_range(&ffi_range) {
             return None;
         }
-        Some(TimeRange::new(
-            crate::RationalTime::new(ffi_range.start_time.value, ffi_range.start_time.rate),
-            crate::RationalTime::new(ffi_range.duration.value, ffi_range.duration.rate),
-        ))
+        Some(time_range_from_ffi(&ffi_range))
     }
 }
 

@@ -1,6 +1,6 @@
 //! `ImageSequenceReference` type for VFX image sequence media.
 
-use crate::{ffi, ffi_string_to_rust, is_unset_time_range, macros, traits, RationalTime, Result, TimeRange};
+use crate::{ffi, ffi_string_to_rust, is_unset_time_range, macros, time_range_from_ffi, traits, RationalTime, Result, TimeRange};
 use std::ffi::CString;
 
 /// Policy for handling missing frames in an image sequence.
@@ -239,10 +239,7 @@ impl ImageSequenceReference {
         if is_unset_time_range(&ffi_range) {
             return None;
         }
-        Some(TimeRange::new(
-            RationalTime::new(ffi_range.start_time.value, ffi_range.start_time.rate),
-            RationalTime::new(ffi_range.duration.value, ffi_range.duration.rate),
-        ))
+        Some(time_range_from_ffi(&ffi_range))
     }
 
     macros::impl_time_range_setter!(

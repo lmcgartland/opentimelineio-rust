@@ -141,6 +141,14 @@ pub(crate) fn is_unset_time_range(tr: &ffi::OtioTimeRange) -> bool {
     tr.duration.rate == 1.0 && tr.duration.value == 0.0
 }
 
+/// Convert an FFI `OtioTimeRange` to a Rust `TimeRange`.
+pub(crate) fn time_range_from_ffi(ffi_range: &ffi::OtioTimeRange) -> TimeRange {
+    TimeRange::new(
+        RationalTime::new(ffi_range.start_time.value, ffi_range.start_time.rate),
+        RationalTime::new(ffi_range.duration.value, ffi_range.duration.rate),
+    )
+}
+
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -223,6 +231,14 @@ impl From<TimeRange> for ffi::OtioTimeRange {
 /// A timeline is the top-level container for editorial content.
 pub struct Timeline {
     ptr: *mut ffi::OtioTimeline,
+}
+
+impl std::fmt::Debug for Timeline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Timeline")
+            .field("name", &self.name())
+            .finish()
+    }
 }
 
 impl Timeline {
@@ -427,6 +443,15 @@ pub struct Track {
     owned: bool,
 }
 
+impl std::fmt::Debug for Track {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Track")
+            .field("kind", &self.kind())
+            .field("children_count", &self.children_count())
+            .finish()
+    }
+}
+
 impl Track {
     /// Create a new video track with the given name.
     #[must_use]
@@ -516,10 +541,7 @@ impl Track {
         if err.code != 0 {
             return Err(err.into());
         }
-        Ok(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&range))
     }
 
     /// Get the trimmed range of this track.
@@ -535,10 +557,7 @@ impl Track {
         if err.code != 0 {
             return Err(err.into());
         }
-        Ok(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&range))
     }
 
     /// Get the parent stack of this track.
@@ -715,7 +734,22 @@ pub struct Clip {
     ptr: *mut ffi::OtioClip,
 }
 
+impl std::fmt::Debug for Clip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Clip")
+            .field("name", &self.name())
+            .finish()
+    }
+}
+
 impl Clip {
+    /// Get the name of this clip.
+    #[must_use]
+    pub fn name(&self) -> String {
+        let ptr = unsafe { ffi::otio_clip_get_name(self.ptr) };
+        ffi_string_to_rust(ptr)
+    }
+
     /// Create a new clip with the given name and source range.
     #[must_use]
     pub fn new(name: &str, source_range: TimeRange) -> Self {
@@ -988,6 +1022,12 @@ pub struct Gap {
     ptr: *mut ffi::OtioGap,
 }
 
+impl std::fmt::Debug for Gap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gap").finish()
+    }
+}
+
 impl Gap {
     /// Create a new gap with the given duration.
     #[must_use]
@@ -1002,6 +1042,14 @@ traits::impl_has_metadata!(Gap, otio_gap_set_metadata_string, otio_gap_get_metad
 /// An external reference points to a media file.
 pub struct ExternalReference {
     ptr: *mut ffi::OtioExternalRef,
+}
+
+impl std::fmt::Debug for ExternalReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExternalReference")
+            .field("target_url", &self.target_url())
+            .finish()
+    }
 }
 
 impl ExternalReference {
@@ -1045,10 +1093,7 @@ impl ExternalReference {
         if is_unset_time_range(&range) {
             return None;
         }
-        Some(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Some(time_range_from_ffi(&range))
     }
 }
 
@@ -1064,7 +1109,23 @@ pub struct Stack {
     ptr: *mut ffi::OtioStack,
 }
 
+impl std::fmt::Debug for Stack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Stack")
+            .field("name", &self.name())
+            .field("children_count", &self.children_count())
+            .finish()
+    }
+}
+
 impl Stack {
+    /// Get the name of this stack.
+    #[must_use]
+    pub fn name(&self) -> String {
+        let ptr = unsafe { ffi::otio_stack_get_name(self.ptr) };
+        ffi_string_to_rust(ptr)
+    }
+
     /// Create a new stack with the given name.
     #[must_use]
     pub fn new(name: &str) -> Self {
@@ -1101,10 +1162,7 @@ impl Stack {
         if err.code != 0 {
             return Err(err.into());
         }
-        Ok(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&range))
     }
 
     /// Get the trimmed range of this stack.
@@ -1120,10 +1178,7 @@ impl Stack {
         if err.code != 0 {
             return Err(err.into());
         }
-        Ok(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&range))
     }
 
     /// Get the parent stack of this stack.

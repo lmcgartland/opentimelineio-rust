@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use crate::ffi;
 use crate::ffi_string_to_rust;
 use crate::macros;
+use crate::time_range_from_ffi;
 use crate::{OtioError, RationalTime, Result, TimeRange};
 
 /// Child type constants (must match C header defines)
@@ -68,16 +69,7 @@ impl ClipRef<'_> {
     #[must_use]
     pub fn source_range(&self) -> TimeRange {
         let range = unsafe { ffi::otio_clip_get_source_range(self.ptr) };
-        TimeRange {
-            start_time: RationalTime {
-                value: range.start_time.value,
-                rate: range.start_time.rate,
-            },
-            duration: RationalTime {
-                value: range.duration.value,
-                rate: range.duration.rate,
-            },
-        }
+        time_range_from_ffi(&range)
     }
 
     /// Get the parent composition of this clip.
@@ -102,10 +94,7 @@ impl ClipRef<'_> {
         if err.code != 0 {
             return Err(OtioError::from(err));
         }
-        Ok(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&range))
     }
 
     /// Transform a time from this clip's coordinate space to a target item's space.
@@ -172,10 +161,7 @@ impl ClipRef<'_> {
         if err.code != 0 {
             return Err(OtioError::from(err));
         }
-        Ok(TimeRange::new(
-            RationalTime::new(result.start_time.value, result.start_time.rate),
-            RationalTime::new(result.duration.value, result.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&result))
     }
 }
 
@@ -229,10 +215,7 @@ impl GapRef<'_> {
         if err.code != 0 {
             return Err(OtioError::from(err));
         }
-        Ok(TimeRange::new(
-            RationalTime::new(range.start_time.value, range.start_time.rate),
-            RationalTime::new(range.duration.value, range.duration.rate),
-        ))
+        Ok(time_range_from_ffi(&range))
     }
 }
 

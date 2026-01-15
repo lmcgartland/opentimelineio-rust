@@ -281,10 +281,7 @@ macro_rules! impl_time_range_getter {
         #[must_use]
         pub fn $method(&self) -> crate::TimeRange {
             let ffi_range = unsafe { crate::ffi::$ffi_fn(self.ptr) };
-            crate::TimeRange::new(
-                crate::RationalTime::new(ffi_range.start_time.value, ffi_range.start_time.rate),
-                crate::RationalTime::new(ffi_range.duration.value, ffi_range.duration.rate),
-            )
+            crate::time_range_from_ffi(&ffi_range)
         }
     };
 }
