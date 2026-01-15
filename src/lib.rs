@@ -198,10 +198,7 @@ impl Timeline {
     ///
     /// Returns an error if the global start time cannot be set.
     pub fn set_global_start_time(&mut self, time: RationalTime) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_timeline_set_global_start_time(self.ptr, time.into(), &mut err) };
         if result != 0 {
@@ -234,10 +231,7 @@ impl Timeline {
     /// Returns an error if the file cannot be written.
     pub fn write_to_file(&self, path: &Path) -> Result<()> {
         let c_path = CString::new(path.to_string_lossy().as_ref()).unwrap();
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_timeline_write_to_file(self.ptr, c_path.as_ptr(), &mut err) };
         if result != 0 {
@@ -254,10 +248,7 @@ impl Timeline {
     /// Returns an error if the file cannot be read or parsed.
     pub fn read_from_file(path: &Path) -> Result<Self> {
         let c_path = CString::new(path.to_string_lossy().as_ref()).unwrap();
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let ptr = unsafe { ffi::otio_timeline_read_from_file(c_path.as_ptr(), &mut err) };
         if ptr.is_null() {
             Err(err.into())
@@ -282,10 +273,7 @@ impl Timeline {
     /// println!("Timeline JSON: {}", json);
     /// ```
     pub fn to_json_string(&self) -> Result<String> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let ptr = unsafe { ffi::otio_timeline_to_json_string(self.ptr, &mut err) };
         if ptr.is_null() {
             return Err(err.into());
@@ -311,10 +299,7 @@ impl Timeline {
     /// ```
     pub fn from_json_string(json: &str) -> Result<Self> {
         let c_json = CString::new(json).unwrap();
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let ptr = unsafe { ffi::otio_timeline_from_json_string(c_json.as_ptr(), &mut err) };
         if ptr.is_null() {
             Err(err.into())
@@ -366,10 +351,7 @@ impl Timeline {
     ///
     /// Returns an error if the duration cannot be computed.
     pub fn duration(&self) -> Result<RationalTime> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe { ffi::otio_timeline_get_duration(self.ptr, &mut err) };
         if err.code != 0 {
             return Err(err.into());
@@ -464,10 +446,7 @@ impl Track {
     /// Returns an error if the marker cannot be added.
     #[allow(clippy::forget_non_drop)]
     pub fn add_marker(&mut self, marker: Marker) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe { ffi::otio_track_add_marker(self.ptr, marker.ptr, &mut err) };
         if result != 0 {
             return Err(err.into());
@@ -494,10 +473,7 @@ impl Track {
     /// Returns an error if the index is out of bounds.
     #[allow(clippy::cast_possible_wrap)]
     pub fn range_of_child_at_index(&self, index: usize) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe {
             ffi::otio_track_range_of_child_at_index(self.ptr, index as i32, &mut err)
         };
@@ -518,10 +494,7 @@ impl Track {
     ///
     /// Returns an error if the range cannot be computed.
     pub fn trimmed_range(&self) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe { ffi::otio_track_trimmed_range(self.ptr, &mut err) };
         if err.code != 0 {
             return Err(err.into());
@@ -576,10 +549,7 @@ impl Track {
         range: TimeRange,
         remove_transitions: bool,
     ) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_track_overwrite(
                 self.ptr,
@@ -617,10 +587,7 @@ impl Track {
         time: RationalTime,
         remove_transitions: bool,
     ) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_track_insert_at_time(
                 self.ptr,
@@ -651,10 +618,7 @@ impl Track {
     ///
     /// Returns an error if the slice operation fails.
     pub fn slice_at_time(&mut self, time: RationalTime, remove_transitions: bool) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_track_slice_at_time(
                 self.ptr,
@@ -681,10 +645,7 @@ impl Track {
     ///
     /// Returns an error if the remove operation fails.
     pub fn remove_at_time(&mut self, time: RationalTime, fill_with_gap: bool) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_track_remove_at_time(
                 self.ptr,
@@ -734,10 +695,7 @@ impl Clip {
     /// Returns an error if the media reference cannot be set.
     #[allow(clippy::forget_non_drop)] // Reference ownership transfers to C++
     pub fn set_media_reference(&mut self, reference: ExternalReference) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_clip_set_media_reference(self.ptr, reference.ptr, &mut err) };
         if result != 0 {
@@ -754,10 +712,7 @@ impl Clip {
     /// Returns an error if the reference cannot be set.
     #[allow(clippy::forget_non_drop)]
     pub fn set_missing_reference(&mut self, reference: MissingReference) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_clip_set_missing_reference(self.ptr, reference.ptr, &mut err) };
         if result != 0 {
@@ -774,10 +729,7 @@ impl Clip {
     /// Returns an error if the reference cannot be set.
     #[allow(clippy::forget_non_drop)]
     pub fn set_generator_reference(&mut self, reference: GeneratorReference) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_clip_set_generator_reference(self.ptr, reference.ptr, &mut err) };
         if result != 0 {
@@ -797,10 +749,7 @@ impl Clip {
         &mut self,
         reference: ImageSequenceReference,
     ) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_clip_set_image_sequence_reference(self.ptr, reference.ptr, &mut err)
         };
@@ -818,10 +767,7 @@ impl Clip {
     /// Returns an error if the marker cannot be added.
     #[allow(clippy::forget_non_drop)]
     pub fn add_marker(&mut self, marker: Marker) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe { ffi::otio_clip_add_marker(self.ptr, marker.ptr, &mut err) };
         if result != 0 {
             return Err(err.into());
@@ -845,10 +791,7 @@ impl Clip {
     /// Returns an error if the effect cannot be added.
     #[allow(clippy::forget_non_drop)]
     pub fn add_effect(&mut self, effect: Effect) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe { ffi::otio_clip_add_effect(self.ptr, effect.ptr, &mut err) };
         if result != 0 {
             return Err(err.into());
@@ -864,10 +807,7 @@ impl Clip {
     /// Returns an error if the effect cannot be added.
     #[allow(clippy::forget_non_drop)]
     pub fn add_linear_time_warp(&mut self, effect: LinearTimeWarp) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe { ffi::otio_clip_add_linear_time_warp(self.ptr, effect.ptr, &mut err) };
         if result != 0 {
             return Err(err.into());
@@ -902,10 +842,7 @@ impl Clip {
     ///
     /// Returns an error if the slip operation fails.
     pub fn slip(&mut self, delta: RationalTime) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe { ffi::otio_clip_slip(self.ptr, delta.into(), &mut err) };
         if result != 0 {
             return Err(err.into());
@@ -927,10 +864,7 @@ impl Clip {
     ///
     /// Returns an error if the slide operation fails.
     pub fn slide(&mut self, delta: RationalTime) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe { ffi::otio_clip_slide(self.ptr, delta.into(), &mut err) };
         if result != 0 {
             return Err(err.into());
@@ -952,10 +886,7 @@ impl Clip {
     ///
     /// Returns an error if the trim operation fails.
     pub fn trim(&mut self, delta_in: RationalTime, delta_out: RationalTime) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_clip_trim(self.ptr, delta_in.into(), delta_out.into(), &mut err)
         };
@@ -979,10 +910,7 @@ impl Clip {
     ///
     /// Returns an error if the ripple operation fails.
     pub fn ripple(&mut self, delta_in: RationalTime, delta_out: RationalTime) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_clip_ripple(self.ptr, delta_in.into(), delta_out.into(), &mut err)
         };
@@ -1007,10 +935,7 @@ impl Clip {
     ///
     /// Returns an error if the roll operation fails.
     pub fn roll(&mut self, delta_in: RationalTime, delta_out: RationalTime) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_clip_roll(self.ptr, delta_in.into(), delta_out.into(), &mut err) };
         if result != 0 {
@@ -1058,10 +983,7 @@ impl ExternalReference {
     ///
     /// Returns an error if the available range cannot be set.
     pub fn set_available_range(&mut self, range: TimeRange) -> Result<()> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result =
             unsafe { ffi::otio_external_ref_set_available_range(self.ptr, range.into(), &mut err) };
         if result != 0 {
@@ -1142,10 +1064,7 @@ impl Stack {
     /// Returns an error if the index is out of bounds.
     #[allow(clippy::cast_possible_wrap)]
     pub fn range_of_child_at_index(&self, index: usize) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe {
             ffi::otio_stack_range_of_child_at_index(self.ptr, index as i32, &mut err)
         };
@@ -1166,10 +1085,7 @@ impl Stack {
     ///
     /// Returns an error if the range cannot be computed.
     pub fn trimmed_range(&self) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe { ffi::otio_stack_trimmed_range(self.ptr, &mut err) };
         if err.code != 0 {
             return Err(err.into());

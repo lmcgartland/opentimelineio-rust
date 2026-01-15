@@ -347,28 +347,6 @@ macro_rules! impl_rational_time_setter {
     };
 }
 
-/// Generates a bool getter method.
-macro_rules! impl_bool_getter {
-    ($method:ident, $ffi_fn:ident, $doc:expr) => {
-        #[doc = $doc]
-        #[must_use]
-        pub fn $method(&self) -> bool {
-            let result = unsafe { crate::ffi::$ffi_fn(self.ptr) };
-            result == 1
-        }
-    };
-}
-
-/// Generates a bool setter method.
-macro_rules! impl_bool_setter {
-    ($method:ident, $ffi_fn:ident, $doc:expr) => {
-        #[doc = $doc]
-        pub fn $method(&mut self, value: bool) {
-            unsafe { crate::ffi::$ffi_fn(self.ptr, i32::from(value)) };
-        }
-    };
-}
-
 /// Generates a double getter method.
 macro_rules! impl_double_getter {
     ($method:ident, $ffi_fn:ident, $doc:expr) => {
@@ -396,8 +374,6 @@ macro_rules! impl_double_setter {
 
 pub(crate) use ffi_error;
 pub(crate) use impl_append;
-pub(crate) use impl_bool_getter;
-pub(crate) use impl_bool_setter;
 pub(crate) use impl_children_count;
 pub(crate) use impl_clear_children;
 pub(crate) use impl_double_getter;

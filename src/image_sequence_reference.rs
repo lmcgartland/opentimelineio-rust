@@ -208,10 +208,7 @@ impl ImageSequenceReference {
     ///
     /// Returns an error if the time is outside the available range.
     pub fn frame_for_time(&self, time: RationalTime) -> Result<i32> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let frame = unsafe { ffi::otio_image_seq_ref_frame_for_time(self.ptr, time.into(), &mut err) };
         if err.code != 0 {
             return Err(err.into());
@@ -225,10 +222,7 @@ impl ImageSequenceReference {
     ///
     /// Returns an error if the image number is invalid.
     pub fn target_url_for_image_number(&self, image_number: i32) -> Result<String> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let ptr = unsafe {
             ffi::otio_image_seq_ref_target_url_for_image_number(self.ptr, image_number, &mut err)
         };

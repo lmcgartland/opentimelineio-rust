@@ -7,6 +7,7 @@ use std::ffi::CStr;
 use std::marker::PhantomData;
 
 use crate::ffi;
+use crate::macros;
 use crate::{OtioError, RationalTime, Result, TimeRange};
 
 /// Child type constants (must match C header defines)
@@ -102,10 +103,7 @@ impl ClipRef<'_> {
     ///
     /// Returns an error if the clip has no parent or the range cannot be computed.
     pub fn range_in_parent(&self) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe { ffi::otio_clip_range_in_parent(self.ptr, &mut err) };
         if err.code != 0 {
             return Err(OtioError::from(err));
@@ -134,10 +132,7 @@ impl ClipRef<'_> {
         time: RationalTime,
         to_track: &TrackRef<'_>,
     ) -> Result<RationalTime> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_item_transformed_time(
                 self.ptr.cast(),
@@ -169,10 +164,7 @@ impl ClipRef<'_> {
         range: TimeRange,
         to_track: &TrackRef<'_>,
     ) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_item_transformed_time_range(
                 self.ptr.cast(),
@@ -244,10 +236,7 @@ impl GapRef<'_> {
     ///
     /// Returns an error if the gap has no parent or the range cannot be computed.
     pub fn range_in_parent(&self) -> Result<TimeRange> {
-        let mut err = ffi::OtioError {
-            code: 0,
-            message: [0; 256],
-        };
+        let mut err = macros::ffi_error!();
         let range = unsafe { ffi::otio_gap_range_in_parent(self.ptr, &mut err) };
         if err.code != 0 {
             return Err(OtioError::from(err));
