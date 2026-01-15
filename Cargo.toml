@@ -1,0 +1,29 @@
+[package]
+name = "otio-rs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Luke McGartland"]
+description = "Rust bindings to OpenTimelineIO - an open-source API and interchange format for editorial timeline information"
+repository = "https://github.com/lukemcgartland/opentimelineio-rust"
+license = "MIT OR Apache-2.0"
+keywords = ["video", "editing", "timeline", "otio", "media"]
+categories = ["multimedia", "multimedia::video", "parser-implementations"]
+readme = "README.md"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.69"
+cmake = "0.1"
+
+[dev-dependencies]
+serde_json = "1.0"
+tempfile = "3.10"
+
+[features]
+default = []
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
