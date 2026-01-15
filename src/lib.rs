@@ -167,7 +167,7 @@ impl Timeline {
     pub fn add_video_track(&mut self, name: &str) -> Track {
         let c_name = CString::new(name).unwrap();
         let ptr = unsafe { ffi::otio_timeline_add_video_track(self.ptr, c_name.as_ptr()) };
-        Track { ptr }
+        Track { ptr, owned: false } // Timeline owns this track
     }
 
     /// Add an audio track to the timeline.
@@ -175,7 +175,7 @@ impl Timeline {
     pub fn add_audio_track(&mut self, name: &str) -> Track {
         let c_name = CString::new(name).unwrap();
         let ptr = unsafe { ffi::otio_timeline_add_audio_track(self.ptr, c_name.as_ptr()) };
-        Track { ptr }
+        Track { ptr, owned: false } // Timeline owns this track
     }
 
     /// Write the timeline to a JSON file.
@@ -216,6 +216,15 @@ impl Timeline {
             Ok(Self { ptr })
         }
     }
+
+    /// Get the root stack (tracks container) for this timeline.
+    ///
+    /// The returned `StackRef` is a non-owning reference to the timeline's stack.
+    #[must_use]
+    pub fn tracks(&self) -> StackRef<'_> {
+        let ptr = unsafe { ffi::otio_timeline_get_tracks(self.ptr) };
+        StackRef { ptr, _marker: std::marker::PhantomData }
+    }
 }
 
 impl Drop for Timeline {
@@ -229,12 +238,31 @@ unsafe impl Send for Timeline {}
 
 /// A track contains clips, gaps, and other items.
 ///
-/// Tracks do not own their memory - they are owned by the parent Timeline.
+/// Tracks can be created standalone or added to a Timeline. When created
+/// standalone, the Track owns its memory. When added to a Timeline or Stack,
+/// ownership transfers to the parent.
 pub struct Track {
     ptr: *mut ffi::OtioTrack,
+    owned: bool,
 }
 
 impl Track {
+    /// Create a new video track with the given name.
+    #[must_use]
+    pub fn new_video(name: &str) -> Self {
+        let c_name = CString::new(name).unwrap();
+        let ptr = unsafe { ffi::otio_track_create_video(c_name.as_ptr()) };
+        Self { ptr, owned: true }
+    }
+
+    /// Create a new audio track with the given name.
+    #[must_use]
+    pub fn new_audio(name: &str) -> Self {
+        let c_name = CString::new(name).unwrap();
+        let ptr = unsafe { ffi::otio_track_create_audio(c_name.as_ptr()) };
+        Self { ptr, owned: true }
+    }
+
     /// Append a clip to this track.
     ///
     /// # Errors
@@ -274,7 +302,40 @@ impl Track {
             Ok(())
         }
     }
+
+    /// Append a stack to this track.
+    ///
+    /// This is useful for versioning and alternative cuts within a track.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stack cannot be appended.
+    #[allow(clippy::forget_non_drop)] // Stack ownership transfers to C++
+    pub fn append_stack(&mut self, stack: Stack) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_track_append_stack(self.ptr, stack.ptr, &mut err) };
+        std::mem::forget(stack); // Track now owns the stack
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
 }
+
+impl Drop for Track {
+    fn drop(&mut self) {
+        if self.owned {
+            unsafe { ffi::otio_track_free(self.ptr) }
+        }
+    }
+}
+
+// Safety: Track is safe to send between threads
+unsafe impl Send for Track {}
 
 /// A clip represents a segment of media.
 pub struct Clip {
@@ -336,5 +397,133 @@ impl ExternalReference {
     /// Set the available range for this media reference.
     pub fn set_available_range(&mut self, range: TimeRange) {
         unsafe { ffi::otio_external_ref_set_available_range(self.ptr, range.into()) }
+    }
+}
+
+/// A stack is a composition that layers its children.
+///
+/// Stacks are used for:
+/// - Timeline's root tracks container
+/// - Nested compositions within tracks (for versioning/alternatives)
+/// - Clip stacks for layered effects
+pub struct Stack {
+    ptr: *mut ffi::OtioStack,
+}
+
+impl Stack {
+    /// Create a new stack with the given name.
+    #[must_use]
+    pub fn new(name: &str) -> Self {
+        let c_name = CString::new(name).unwrap();
+        let ptr = unsafe { ffi::otio_stack_create(c_name.as_ptr()) };
+        Self { ptr }
+    }
+
+    /// Append a track to this stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the track cannot be appended.
+    #[allow(clippy::forget_non_drop)] // Track ownership transfers to C++
+    pub fn append_track(&mut self, track: Track) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_stack_append_track(self.ptr, track.ptr, &mut err) };
+        std::mem::forget(track); // Stack now owns the track
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Append a clip to this stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clip cannot be appended.
+    #[allow(clippy::forget_non_drop)] // Clip ownership transfers to C++
+    pub fn append_clip(&mut self, clip: Clip) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_stack_append_clip(self.ptr, clip.ptr, &mut err) };
+        std::mem::forget(clip); // Stack now owns the clip
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Append a gap to this stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the gap cannot be appended.
+    #[allow(clippy::forget_non_drop)] // Gap ownership transfers to C++
+    pub fn append_gap(&mut self, gap: Gap) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_stack_append_gap(self.ptr, gap.ptr, &mut err) };
+        std::mem::forget(gap); // Stack now owns the gap
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Append a child stack to this stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the child stack cannot be appended.
+    #[allow(clippy::forget_non_drop)] // Stack ownership transfers to C++
+    pub fn append_stack(&mut self, child: Stack) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_stack_append_stack(self.ptr, child.ptr, &mut err) };
+        std::mem::forget(child); // Parent stack now owns the child
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for Stack {
+    fn drop(&mut self) {
+        unsafe { ffi::otio_stack_free(self.ptr) }
+    }
+}
+
+// Safety: Stack is safe to send between threads
+unsafe impl Send for Stack {}
+
+/// A non-owning reference to a stack.
+///
+/// This is returned by `Timeline::tracks()` and does not own its memory.
+pub struct StackRef<'a> {
+    ptr: *mut ffi::OtioStack,
+    _marker: std::marker::PhantomData<&'a ()>,
+}
+
+impl StackRef<'_> {
+    /// Get the raw pointer to the stack.
+    ///
+    /// This is useful for advanced use cases where you need to pass the stack
+    /// to FFI functions directly.
+    #[must_use]
+    pub fn as_ptr(&self) -> *mut ffi::OtioStack {
+        self.ptr
     }
 }

@@ -95,6 +95,37 @@ OtioTrack* otio_timeline_add_audio_track(OtioTimeline* tl, const char* name) {
     }
 }
 
+OtioTrack* otio_track_create_video(const char* name) {
+    try {
+        auto track = new otio::Track(name, std::nullopt, otio::Track::Kind::video);
+        Retainer<otio::Track> retainer(track);
+        return reinterpret_cast<OtioTrack*>(retainer.take_value());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+OtioTrack* otio_track_create_audio(const char* name) {
+    try {
+        auto track = new otio::Track(name, std::nullopt, otio::Track::Kind::audio);
+        Retainer<otio::Track> retainer(track);
+        return reinterpret_cast<OtioTrack*>(retainer.take_value());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void otio_track_free(OtioTrack* track) {
+    if (track) {
+        try {
+            auto t = reinterpret_cast<otio::Track*>(track);
+            Retainer<otio::Track> retainer(t);
+        } catch (...) {
+            // Ignore exceptions during cleanup
+        }
+    }
+}
+
 OtioClip* otio_clip_create(const char* name, OtioTimeRange source_range) {
     try {
         auto clip = new otio::Clip(name, nullptr, to_otio_tr(source_range));
@@ -238,10 +269,142 @@ OtioTimeline* otio_timeline_read_from_file(const char* path, OtioError* err) {
 void otio_clip_set_metadata_string(OtioClip* clip, const char* key, const char* value) {
     try {
         auto c = reinterpret_cast<otio::Clip*>(clip);
-        c->metadata()[key] = value;
+        c->metadata()[std::string(key)] = std::string(value);
     } catch (...) {
         // Ignore
     }
 }
 
+// Stack functions
+OtioStack* otio_stack_create(const char* name) {
+    try {
+        auto stack = new otio::Stack(name);
+        Retainer<otio::Stack> retainer(stack);
+        return reinterpret_cast<OtioStack*>(retainer.take_value());
+    } catch (...) {
+        return nullptr;
+    }
 }
+
+void otio_stack_free(OtioStack* stack) {
+    if (stack) {
+        try {
+            auto s = reinterpret_cast<otio::Stack*>(stack);
+            Retainer<otio::Stack> retainer(s);
+        } catch (...) {
+            // Ignore exceptions during cleanup
+        }
+    }
+}
+
+int otio_stack_append_track(OtioStack* stack, OtioTrack* track, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto t = reinterpret_cast<otio::Track*>(track);
+        otio::ErrorStatus status;
+        s->append_child(t, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_append_clip(OtioStack* stack, OtioClip* clip, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto c = reinterpret_cast<otio::Clip*>(clip);
+        otio::ErrorStatus status;
+        s->append_child(c, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_append_gap(OtioStack* stack, OtioGap* gap, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto g = reinterpret_cast<otio::Gap*>(gap);
+        otio::ErrorStatus status;
+        s->append_child(g, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_append_stack(OtioStack* stack, OtioStack* child, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto c = reinterpret_cast<otio::Stack*>(child);
+        otio::ErrorStatus status;
+        s->append_child(c, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+OtioStack* otio_timeline_get_tracks(OtioTimeline* tl) {
+    try {
+        auto timeline = reinterpret_cast<otio::Timeline*>(tl);
+        return reinterpret_cast<OtioStack*>(timeline->tracks());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+int otio_track_append_stack(OtioTrack* track, OtioStack* stack, OtioError* err) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        otio::ErrorStatus status;
+        t->append_child(s, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+}
+
