@@ -22,6 +22,26 @@ const CHILD_TYPE_TRANSITION: i32 = 4;
 const PARENT_TYPE_TRACK: i32 = 1;
 const PARENT_TYPE_STACK: i32 = 2;
 
+/// Convert an FFI pointer and type to a Composable enum variant.
+///
+/// Returns `None` if the pointer is null or the type is unknown.
+pub(crate) fn composable_from_ffi<'a>(
+    ptr: *mut std::ffi::c_void,
+    child_type: i32,
+) -> Option<Composable<'a>> {
+    if ptr.is_null() {
+        return None;
+    }
+    match child_type {
+        CHILD_TYPE_CLIP => Some(Composable::Clip(ClipRef::new(ptr.cast()))),
+        CHILD_TYPE_GAP => Some(Composable::Gap(GapRef::new(ptr.cast()))),
+        CHILD_TYPE_STACK => Some(Composable::Stack(StackRef::new(ptr.cast()))),
+        CHILD_TYPE_TRACK => Some(Composable::Track(TrackRef::new(ptr.cast()))),
+        CHILD_TYPE_TRANSITION => Some(Composable::Transition(TransitionRef::new(ptr.cast()))),
+        _ => None,
+    }
+}
+
 /// A composable child item from a Track or Stack.
 ///
 /// This enum represents the different types of items that can be children
@@ -70,6 +90,24 @@ impl ClipRef<'_> {
     pub fn source_range(&self) -> TimeRange {
         let range = unsafe { ffi::otio_clip_get_source_range(self.ptr) };
         time_range_from_ffi(&range)
+    }
+
+    /// Get the available range of this clip's media.
+    ///
+    /// This is the range of media that is available from the media reference,
+    /// which may differ from the `source_range` (the portion actually used).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clip has no media reference or the range cannot
+    /// be computed.
+    pub fn available_range(&self) -> Result<TimeRange> {
+        let mut err = macros::ffi_error!();
+        let range = unsafe { ffi::otio_clip_available_range(self.ptr, &mut err) };
+        if err.code != 0 {
+            return Err(OtioError::from(err));
+        }
+        Ok(time_range_from_ffi(&range))
     }
 
     /// Get the parent composition of this clip.
@@ -374,6 +412,17 @@ impl TrackRef<'_> {
     pub fn parent(&self) -> Option<StackRef<'_>> {
         get_track_parent(self.ptr)
     }
+
+    /// Get the kind of this track (video or audio).
+    #[must_use]
+    pub fn kind(&self) -> crate::TrackKind {
+        let kind = unsafe { ffi::otio_track_get_kind(self.ptr) };
+        if kind == 1 {
+            crate::TrackKind::Audio
+        } else {
+            crate::TrackKind::Video
+        }
+    }
 }
 
 crate::traits::impl_has_metadata!(
@@ -648,6 +697,83 @@ impl Drop for ClipSearchIter<'_> {
     fn drop(&mut self) {
         if !self.ptr.is_null() {
             unsafe { ffi::otio_clip_iterator_free(self.ptr) };
+        }
+    }
+}
+
+// ============================================================================
+// Track Iterator (for video_tracks / audio_tracks)
+// ============================================================================
+
+/// An iterator over tracks returned by [`Timeline::video_tracks`] or
+/// [`Timeline::audio_tracks`].
+pub struct TrackIter<'a> {
+    ptr: *mut ffi::OtioTrackIterator,
+    _marker: PhantomData<&'a ()>,
+}
+
+impl TrackIter<'_> {
+    /// Create a new track iterator from a raw pointer.
+    pub(crate) fn new(ptr: *mut ffi::OtioTrackIterator) -> Self {
+        Self {
+            ptr,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Get the total number of tracks.
+    #[must_use]
+    #[allow(clippy::cast_sign_loss)]
+    pub fn count(&self) -> usize {
+        if self.ptr.is_null() {
+            0
+        } else {
+            unsafe { ffi::otio_track_iterator_count(self.ptr) }.max(0) as usize
+        }
+    }
+
+    /// Reset the iterator to the beginning.
+    pub fn reset(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe { ffi::otio_track_iterator_reset(self.ptr) };
+        }
+    }
+}
+
+impl<'a> Iterator for TrackIter<'a> {
+    type Item = TrackRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ptr.is_null() {
+            return None;
+        }
+        let track_ptr = unsafe { ffi::otio_track_iterator_next(self.ptr) };
+        if track_ptr.is_null() {
+            None
+        } else {
+            Some(TrackRef {
+                ptr: track_ptr,
+                _marker: PhantomData,
+            })
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let count = self.count();
+        (0, Some(count))
+    }
+}
+
+impl ExactSizeIterator for TrackIter<'_> {
+    fn len(&self) -> usize {
+        self.count()
+    }
+}
+
+impl Drop for TrackIter<'_> {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe { ffi::otio_track_iterator_free(self.ptr) };
         }
     }
 }

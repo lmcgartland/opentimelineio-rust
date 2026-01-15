@@ -15,13 +15,17 @@ This crate provides FFI bindings to the C++ OpenTimelineIO library (v0.17.0) via
 - **Timeline creation and manipulation** - Create timelines, tracks, clips, gaps, and stacks
 - **Edit algorithms** - NLE-style editing operations (overwrite, insert, slice, slip, slide, trim, ripple, roll)
 - **Iteration support** - Iterate over children of tracks and stacks with type-safe `Composable` enum
+- **Track filtering** - Get video-only or audio-only tracks from a timeline
+- **Track neighbors** - Get adjacent items before/after a child in a track
 - **Time transforms** - Convert times between different coordinate spaces in the hierarchy
+- **Available range** - Get the available range from a clip's media reference
 - **String serialization** - Serialize/deserialize timelines to/from JSON strings
 - **Builder pattern** - Fluent API for constructing clips, timelines, and references
 - **Metadata support** - Get/set string metadata on all OTIO objects via `HasMetadata` trait
 - **Markers and effects** - Add markers, linear time warps, and freeze frames
 - **Transitions** - Cross-dissolves and other transition types
 - **Media references** - External references, image sequences, generators, and missing references
+- **Multi-reference clips** - Multiple media references per clip with key-based selection
 - **File I/O** - Read and write `.otio` JSON files
 - **Flexible linking** - Use vendored (bundled) or system-installed OpenTimelineIO
 
@@ -380,6 +384,81 @@ for child in timeline.tracks().children() {
 }
 ```
 
+## Track Filtering
+
+Get video or audio tracks from a timeline:
+
+```rust
+use otio_rs::{Timeline, TrackKind};
+
+let mut timeline = Timeline::new("My Timeline");
+timeline.add_video_track("V1");
+timeline.add_video_track("V2");
+timeline.add_audio_track("A1");
+
+// Get only video tracks
+for track in timeline.video_tracks() {
+    println!("Video track: {}", track.name());
+    assert_eq!(track.kind(), TrackKind::Video);
+}
+
+// Get only audio tracks
+for track in timeline.audio_tracks() {
+    println!("Audio track: {}", track.name());
+}
+
+// ExactSizeIterator support
+let video_count = timeline.video_tracks().len();
+```
+
+## Track Neighbors
+
+Get the neighbors of a child item in a track:
+
+```rust
+use otio_rs::{Timeline, Clip, RationalTime, TimeRange, NeighborGapPolicy, Composable};
+
+let mut timeline = Timeline::new("Test");
+let mut track = timeline.add_video_track("V1");
+
+let range = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0));
+track.append_clip(Clip::new("A", range))?;
+track.append_clip(Clip::new("B", range))?;
+track.append_clip(Clip::new("C", range))?;
+
+// Get neighbors of clip B (index 1)
+let neighbors = track.neighbors_of(1, NeighborGapPolicy::Never)?;
+
+if let Some(Composable::Clip(left)) = neighbors.left {
+    println!("Left neighbor: {}", left.name()); // "A"
+}
+if let Some(Composable::Clip(right)) = neighbors.right {
+    println!("Right neighbor: {}", right.name()); // "C"
+}
+```
+
+## Available Range
+
+Get the available range from a clip's media reference:
+
+```rust
+use otio_rs::{Clip, ExternalReference, RationalTime, TimeRange};
+
+let range = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0));
+let mut clip = Clip::new("My Clip", range);
+
+let mut media_ref = ExternalReference::new("/path/to/media.mov");
+media_ref.set_available_range(TimeRange::new(
+    RationalTime::new(0.0, 24.0),
+    RationalTime::new(1000.0, 24.0), // Full media is 1000 frames
+))?;
+clip.set_media_reference(media_ref)?;
+
+// Get available range from the media reference
+let available = clip.available_range()?;
+println!("Available duration: {} frames", available.duration.value);
+```
+
 ## Metadata
 
 All OTIO objects support string metadata via the `HasMetadata` trait:
@@ -571,6 +650,7 @@ otio-rs/
 │   └── builder.rs      # Builder pattern
 └── tests/
     ├── extended_features.rs  # Comprehensive feature tests
+    ├── new_features.rs       # Track filtering, neighbors, available_range tests
     ├── memory.rs             # Memory leak stress tests
     ├── error_handling.rs     # FFI error propagation tests
     ├── roundtrip.rs          # File I/O tests

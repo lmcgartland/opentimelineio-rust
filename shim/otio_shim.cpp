@@ -471,6 +471,56 @@ int otio_track_clear_children(OtioTrack* track, OtioError* err) {
     return clear_children_impl(reinterpret_cast<otio::Track*>(track), err);
 }
 
+// Helper to get composable type from pointer
+static int32_t get_composable_type(otio::Composable* comp) {
+    if (!comp) return -1;
+    if (dynamic_cast<otio::Clip*>(comp)) return OTIO_CHILD_TYPE_CLIP;
+    if (dynamic_cast<otio::Gap*>(comp)) return OTIO_CHILD_TYPE_GAP;
+    if (dynamic_cast<otio::Stack*>(comp)) return OTIO_CHILD_TYPE_STACK;
+    if (dynamic_cast<otio::Track*>(comp)) return OTIO_CHILD_TYPE_TRACK;
+    if (dynamic_cast<otio::Transition*>(comp)) return OTIO_CHILD_TYPE_TRANSITION;
+    return -1;
+}
+
+OtioNeighbors otio_track_neighbors_of(OtioTrack* track, int32_t child_index,
+                                       int32_t gap_policy, OtioError* err) {
+    OtioNeighbors result = {nullptr, -1, nullptr, -1};
+    OTIO_NULL_CHECK_ERR(track, err, result, "Track is null");
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto& children = t->children();
+        if (child_index < 0 || static_cast<size_t>(child_index) >= children.size()) {
+            set_error(err, 1, "Index out of bounds");
+            return result;
+        }
+
+        otio::ErrorStatus status;
+        auto policy = static_cast<otio::Track::NeighborGapPolicy>(gap_policy);
+        auto [left, right] = t->neighbors_of(children[child_index].value, &status, policy);
+
+        if (otio::is_error(status)) {
+            set_error(err, static_cast<int>(status.outcome), status.details.c_str());
+            return result;
+        }
+
+        if (left) {
+            result.left = left.value;
+            result.left_type = get_composable_type(left.value);
+        }
+        if (right) {
+            result.right = right.value;
+            result.right_type = get_composable_type(right.value);
+        }
+        return result;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return result;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return result;
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Clip
 // ----------------------------------------------------------------------------
@@ -518,6 +568,147 @@ OtioTimeRange otio_clip_get_source_range(OtioClip* clip) {
     } catch (...) {
     }
     return zero;
+}
+
+OtioTimeRange otio_clip_available_range(OtioClip* clip, OtioError* err) {
+    OtioTimeRange zero = {OtioRationalTime{0, 1}, OtioRationalTime{0, 1}};
+    OTIO_NULL_CHECK_ERR(clip, err, zero, "Clip is null");
+    try {
+        OTIO_CAST(Clip, c, clip);
+        otio::ErrorStatus status;
+        auto range = c->available_range(&status);
+        if (otio::is_error(status)) {
+            set_error(err, static_cast<int>(status.outcome), status.details.c_str());
+            return zero;
+        }
+        return OtioTimeRange{
+            OtioRationalTime{range.start_time().value(), range.start_time().rate()},
+            OtioRationalTime{range.duration().value(), range.duration().rate()}
+        };
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return zero;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return zero;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Clip Multi-Reference Support
+// ----------------------------------------------------------------------------
+
+struct OtioStringIterator {
+    std::vector<std::string> strings;
+    size_t index;
+    OtioStringIterator() : index(0) {}
+};
+
+OtioStringIterator* otio_clip_media_reference_keys(OtioClip* clip) {
+    OTIO_NULL_CHECK(clip, nullptr);
+    OTIO_TRY_PTR(
+        OTIO_CAST(Clip, c, clip);
+        auto iter = new OtioStringIterator();
+        const auto& refs = c->media_references();
+        for (const auto& pair : refs) {
+            iter->strings.push_back(pair.first);
+        }
+        return iter;
+    )
+}
+
+int32_t otio_string_iterator_count(OtioStringIterator* iter) {
+    if (!iter) return 0;
+    return static_cast<int32_t>(iter->strings.size());
+}
+
+char* otio_string_iterator_next(OtioStringIterator* iter) {
+    if (!iter || iter->index >= iter->strings.size()) return nullptr;
+    return safe_strdup(iter->strings[iter->index++]);
+}
+
+void otio_string_iterator_reset(OtioStringIterator* iter) {
+    if (iter) iter->index = 0;
+}
+
+void otio_string_iterator_free(OtioStringIterator* iter) {
+    delete iter;
+}
+
+char* otio_clip_active_media_reference_key(OtioClip* clip) {
+    OTIO_NULL_CHECK(clip, nullptr);
+    OTIO_TRY_PTR(
+        OTIO_CAST(Clip, c, clip);
+        return safe_strdup(c->active_media_reference_key());
+    )
+}
+
+int otio_clip_set_active_media_reference_key(OtioClip* clip, const char* key, OtioError* err) {
+    OTIO_NULL_CHECK_ERR(clip, err, -1, "Clip is null");
+    OTIO_NULL_CHECK_ERR(key, err, -1, "Key is null");
+    try {
+        OTIO_CAST(Clip, c, clip);
+        c->set_active_media_reference_key(key);
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_clip_add_media_reference(OtioClip* clip, const char* key,
+                                   void* ref, int32_t ref_type, OtioError* err) {
+    OTIO_NULL_CHECK_ERR(clip, err, -1, "Clip is null");
+    OTIO_NULL_CHECK_ERR(key, err, -1, "Key is null");
+    OTIO_NULL_CHECK_ERR(ref, err, -1, "Reference is null");
+    try {
+        OTIO_CAST(Clip, c, clip);
+        otio::MediaReference* media_ref = nullptr;
+        switch (ref_type) {
+            case 0: // OTIO_REF_TYPE_EXTERNAL
+                media_ref = reinterpret_cast<otio::ExternalReference*>(ref);
+                break;
+            case 1: // OTIO_REF_TYPE_MISSING
+                media_ref = reinterpret_cast<otio::MissingReference*>(ref);
+                break;
+            case 2: // OTIO_REF_TYPE_GENERATOR
+                media_ref = reinterpret_cast<otio::GeneratorReference*>(ref);
+                break;
+            case 3: // OTIO_REF_TYPE_IMAGE_SEQUENCE
+                media_ref = reinterpret_cast<otio::ImageSequenceReference*>(ref);
+                break;
+            default:
+                set_error(err, 1, "Unknown reference type");
+                return -1;
+        }
+        // Get existing references and add the new one
+        auto refs = c->media_references();
+        refs[key] = media_ref;
+        // Keep the current active key
+        std::string active_key = c->active_media_reference_key();
+        c->set_media_references(refs, active_key);
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_clip_has_media_reference(OtioClip* clip, const char* key) {
+    if (!clip || !key) return 0;
+    try {
+        OTIO_CAST(Clip, c, clip);
+        const auto& refs = c->media_references();
+        return refs.find(key) != refs.end() ? 1 : 0;
+    } catch (...) {
+        return 0;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -2427,10 +2618,66 @@ void* otio_stack_get_parent(OtioStack* stack) {
 }
 
 // ----------------------------------------------------------------------------
-// Search algorithms - find_clips
+// Track Iterator (filtered track lists)
 // ----------------------------------------------------------------------------
 
-// Internal structure for clip iterator
+struct OtioTrackIterator {
+    std::vector<otio::Track*> tracks;
+    size_t index;
+
+    OtioTrackIterator() : index(0) {}
+};
+
+OtioTrackIterator* otio_timeline_video_tracks(OtioTimeline* tl) {
+    if (!tl) return nullptr;
+    try {
+        auto timeline = reinterpret_cast<otio::Timeline*>(tl);
+        auto iter = new OtioTrackIterator();
+        for (auto* track : timeline->video_tracks()) {
+            iter->tracks.push_back(track);
+        }
+        return iter;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+OtioTrackIterator* otio_timeline_audio_tracks(OtioTimeline* tl) {
+    if (!tl) return nullptr;
+    try {
+        auto timeline = reinterpret_cast<otio::Timeline*>(tl);
+        auto iter = new OtioTrackIterator();
+        for (auto* track : timeline->audio_tracks()) {
+            iter->tracks.push_back(track);
+        }
+        return iter;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+int32_t otio_track_iterator_count(OtioTrackIterator* iter) {
+    if (!iter) return 0;
+    return static_cast<int32_t>(iter->tracks.size());
+}
+
+OtioTrack* otio_track_iterator_next(OtioTrackIterator* iter) {
+    if (!iter || iter->index >= iter->tracks.size()) return nullptr;
+    return reinterpret_cast<OtioTrack*>(iter->tracks[iter->index++]);
+}
+
+void otio_track_iterator_reset(OtioTrackIterator* iter) {
+    if (iter) iter->index = 0;
+}
+
+void otio_track_iterator_free(OtioTrackIterator* iter) {
+    delete iter;
+}
+
+// ----------------------------------------------------------------------------
+// Clip Iterator (find_clips search)
+// ----------------------------------------------------------------------------
+
 struct OtioClipIterator {
     std::vector<otio::Clip*> clips;
     size_t index;

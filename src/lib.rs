@@ -42,9 +42,10 @@ mod types;
 pub use types::*;
 
 mod iterators;
+use iterators::composable_from_ffi;
 pub use iterators::{
     ClipRef, ClipSearchIter, Composable, GapRef, ParentRef, StackChildIter, StackRef,
-    TrackChildIter, TrackRef, TransitionRef,
+    TrackChildIter, TrackIter, TrackRef, TransitionRef,
 };
 
 mod builders;
@@ -411,6 +412,24 @@ impl Timeline {
         Ok(RationalTime::new(range.duration.value, range.duration.rate))
     }
 
+    /// Get all video tracks in this timeline.
+    ///
+    /// Returns an iterator over video tracks only.
+    #[must_use]
+    pub fn video_tracks(&self) -> iterators::TrackIter<'_> {
+        let ptr = unsafe { ffi::otio_timeline_video_tracks(self.ptr) };
+        iterators::TrackIter::new(ptr)
+    }
+
+    /// Get all audio tracks in this timeline.
+    ///
+    /// Returns an iterator over audio tracks only.
+    #[must_use]
+    pub fn audio_tracks(&self) -> iterators::TrackIter<'_> {
+        let ptr = unsafe { ffi::otio_timeline_audio_tracks(self.ptr) };
+        iterators::TrackIter::new(ptr)
+    }
+
     /// Find all clips in this timeline (recursively).
     ///
     /// Returns an iterator over all clips found in the timeline's tracks
@@ -432,6 +451,32 @@ impl Drop for Timeline {
 
 // Safety: Timeline is safe to send between threads
 unsafe impl Send for Timeline {}
+
+// ============================================================================
+// Track Neighbor Types
+// ============================================================================
+
+/// Policy for including gaps when getting neighbors of a child in a track.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NeighborGapPolicy {
+    /// Never include gaps as neighbors.
+    #[default]
+    Never = 0,
+    /// Include gaps around transitions.
+    AroundTransitions = 1,
+}
+
+/// The neighbors of a composable item in a track.
+///
+/// Returned by [`Track::neighbors_of`] to provide access to the items
+/// immediately before and after a given child.
+#[derive(Debug)]
+pub struct Neighbors<'a> {
+    /// The item before the queried child, if any.
+    pub left: Option<Composable<'a>>,
+    /// The item after the queried child, if any.
+    pub right: Option<Composable<'a>>,
+}
 
 /// A track contains clips, gaps, and other items.
 ///
@@ -577,6 +622,49 @@ impl Track {
     pub fn find_clips(&self) -> ClipSearchIter<'_> {
         let ptr = unsafe { ffi::otio_track_find_clips(self.ptr) };
         ClipSearchIter::new(ptr)
+    }
+
+    /// Get the neighbors of a child at the given index.
+    ///
+    /// Returns the items immediately before and after the child at `index`.
+    /// The `policy` parameter controls whether gaps should be included as neighbors.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The index of the child to get neighbors for
+    /// * `policy` - Policy for including gaps as neighbors
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index is out of bounds.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otio_rs::{Track, NeighborGapPolicy};
+    ///
+    /// let track = Track::new_video("V1");
+    /// // ... add some clips ...
+    /// if let Ok(neighbors) = track.neighbors_of(1, NeighborGapPolicy::Never) {
+    ///     if let Some(left) = neighbors.left {
+    ///         println!("Left neighbor exists");
+    ///     }
+    /// }
+    /// ```
+    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+    pub fn neighbors_of(&self, index: usize, policy: NeighborGapPolicy) -> Result<Neighbors<'_>> {
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_track_neighbors_of(self.ptr, index as i32, policy as i32, &mut err)
+        };
+        if err.code != 0 {
+            return Err(err.into());
+        }
+
+        let left = composable_from_ffi(result.left, result.left_type);
+        let right = composable_from_ffi(result.right, result.right_type);
+
+        Ok(Neighbors { left, right })
     }
 
     // =========================================================================
@@ -822,6 +910,213 @@ impl Clip {
         let mut err = macros::ffi_error!();
         let result = unsafe {
             ffi::otio_clip_set_image_sequence_reference(self.ptr, reference.ptr, &mut err)
+        };
+        if result != 0 {
+            return Err(err.into());
+        }
+        std::mem::forget(reference);
+        Ok(())
+    }
+
+    /// Get the available range of this clip's media.
+    ///
+    /// This is the range of media that is available from the media reference,
+    /// which may differ from the `source_range` (the portion actually used).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clip has no media reference or the range cannot
+    /// be computed.
+    pub fn available_range(&self) -> Result<TimeRange> {
+        let mut err = macros::ffi_error!();
+        let range = unsafe { ffi::otio_clip_available_range(self.ptr, &mut err) };
+        if err.code != 0 {
+            return Err(err.into());
+        }
+        Ok(time_range_from_ffi(&range))
+    }
+
+    // =========================================================================
+    // Multi-Reference Support
+    // =========================================================================
+
+    /// Get the active media reference key.
+    ///
+    /// OTIO clips can have multiple media references (e.g., for different
+    /// resolutions or proxy versions). This returns the key of the currently
+    /// active reference.
+    #[must_use]
+    pub fn active_media_reference_key(&self) -> String {
+        ffi_string_to_rust(unsafe { ffi::otio_clip_active_media_reference_key(self.ptr) })
+    }
+
+    /// Set the active media reference key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key of the media reference to make active
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key does not exist in the clip's media references.
+    pub fn set_active_media_reference_key(&mut self, key: &str) -> Result<()> {
+        let c_key = CString::new(key).unwrap();
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_clip_set_active_media_reference_key(self.ptr, c_key.as_ptr(), &mut err)
+        };
+        if result != 0 {
+            return Err(err.into());
+        }
+        Ok(())
+    }
+
+    /// Get all media reference keys.
+    ///
+    /// Returns a list of all keys in the clip's media reference map.
+    #[must_use]
+    #[allow(clippy::cast_sign_loss)]
+    pub fn media_reference_keys(&self) -> Vec<String> {
+        let iter = unsafe { ffi::otio_clip_media_reference_keys(self.ptr) };
+        if iter.is_null() {
+            return Vec::new();
+        }
+        let count = unsafe { ffi::otio_string_iterator_count(iter) } as usize;
+        let mut keys = Vec::with_capacity(count);
+        loop {
+            let ptr = unsafe { ffi::otio_string_iterator_next(iter) };
+            if ptr.is_null() {
+                break;
+            }
+            keys.push(ffi_string_to_rust(ptr));
+        }
+        unsafe { ffi::otio_string_iterator_free(iter) };
+        keys
+    }
+
+    /// Check if a media reference exists for the given key.
+    #[must_use]
+    pub fn has_media_reference(&self, key: &str) -> bool {
+        let c_key = CString::new(key).unwrap();
+        unsafe { ffi::otio_clip_has_media_reference(self.ptr, c_key.as_ptr()) != 0 }
+    }
+
+    /// Add an external reference with a key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to associate with this reference
+    /// * `reference` - The external reference to add (ownership transfers)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reference cannot be added.
+    #[allow(clippy::forget_non_drop)]
+    pub fn add_external_reference(&mut self, key: &str, reference: ExternalReference) -> Result<()> {
+        let c_key = CString::new(key).unwrap();
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_clip_add_media_reference(
+                self.ptr,
+                c_key.as_ptr(),
+                reference.ptr.cast(),
+                0, // OTIO_REF_TYPE_EXTERNAL
+                &mut err,
+            )
+        };
+        if result != 0 {
+            return Err(err.into());
+        }
+        std::mem::forget(reference);
+        Ok(())
+    }
+
+    /// Add a missing reference with a key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to associate with this reference
+    /// * `reference` - The missing reference to add (ownership transfers)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reference cannot be added.
+    #[allow(clippy::forget_non_drop)]
+    pub fn add_missing_reference(&mut self, key: &str, reference: MissingReference) -> Result<()> {
+        let c_key = CString::new(key).unwrap();
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_clip_add_media_reference(
+                self.ptr,
+                c_key.as_ptr(),
+                reference.ptr.cast(),
+                1, // OTIO_REF_TYPE_MISSING
+                &mut err,
+            )
+        };
+        if result != 0 {
+            return Err(err.into());
+        }
+        std::mem::forget(reference);
+        Ok(())
+    }
+
+    /// Add a generator reference with a key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to associate with this reference
+    /// * `reference` - The generator reference to add (ownership transfers)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reference cannot be added.
+    #[allow(clippy::forget_non_drop)]
+    pub fn add_generator_reference(&mut self, key: &str, reference: GeneratorReference) -> Result<()> {
+        let c_key = CString::new(key).unwrap();
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_clip_add_media_reference(
+                self.ptr,
+                c_key.as_ptr(),
+                reference.ptr.cast(),
+                2, // OTIO_REF_TYPE_GENERATOR
+                &mut err,
+            )
+        };
+        if result != 0 {
+            return Err(err.into());
+        }
+        std::mem::forget(reference);
+        Ok(())
+    }
+
+    /// Add an image sequence reference with a key.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to associate with this reference
+    /// * `reference` - The image sequence reference to add (ownership transfers)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reference cannot be added.
+    #[allow(clippy::forget_non_drop)]
+    pub fn add_image_sequence_reference(
+        &mut self,
+        key: &str,
+        reference: ImageSequenceReference,
+    ) -> Result<()> {
+        let c_key = CString::new(key).unwrap();
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_clip_add_media_reference(
+                self.ptr,
+                c_key.as_ptr(),
+                reference.ptr.cast(),
+                3, // OTIO_REF_TYPE_IMAGE_SEQUENCE
+                &mut err,
+            )
         };
         if result != 0 {
             return Err(err.into());

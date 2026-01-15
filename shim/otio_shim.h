@@ -142,12 +142,62 @@ char* otio_stack_get_name(OtioStack* stack);
 // Source range accessor
 OtioTimeRange otio_clip_get_source_range(OtioClip* clip);
 
+// Available range (from media reference)
+OtioTimeRange otio_clip_available_range(OtioClip* clip, OtioError* err);
+
+// ============================================================================
+// Clip Multi-Reference Support
+// ============================================================================
+
+// String iterator for media reference keys
+typedef struct OtioStringIterator OtioStringIterator;
+
+// Get all media reference keys from a clip
+OtioStringIterator* otio_clip_media_reference_keys(OtioClip* clip);
+int32_t otio_string_iterator_count(OtioStringIterator* iter);
+char* otio_string_iterator_next(OtioStringIterator* iter);  // caller must free with otio_free_string
+void otio_string_iterator_reset(OtioStringIterator* iter);
+void otio_string_iterator_free(OtioStringIterator* iter);
+
+// Get/set active media reference key
+char* otio_clip_active_media_reference_key(OtioClip* clip);  // caller must free with otio_free_string
+int otio_clip_set_active_media_reference_key(OtioClip* clip, const char* key, OtioError* err);
+
+// Add media reference with key
+int otio_clip_add_media_reference(OtioClip* clip, const char* key,
+                                   void* ref, int32_t ref_type, OtioError* err);
+
+// Check if clip has a media reference for the given key
+int otio_clip_has_media_reference(OtioClip* clip, const char* key);
+
+// Media reference type constants for multi-reference API
+#define OTIO_REF_TYPE_EXTERNAL          0
+#define OTIO_REF_TYPE_MISSING           1
+#define OTIO_REF_TYPE_GENERATOR         2
+#define OTIO_REF_TYPE_IMAGE_SEQUENCE    3
+
 // Track modification operations
 int otio_track_remove_child(OtioTrack* track, int32_t index, OtioError* err);
 int otio_track_insert_clip(OtioTrack* track, int32_t index, OtioClip* clip, OtioError* err);
 int otio_track_insert_gap(OtioTrack* track, int32_t index, OtioGap* gap, OtioError* err);
 int otio_track_insert_stack(OtioTrack* track, int32_t index, OtioStack* stack, OtioError* err);
 int otio_track_clear_children(OtioTrack* track, OtioError* err);
+
+// NeighborGapPolicy constants
+#define OTIO_NEIGHBOR_GAP_NEVER              0
+#define OTIO_NEIGHBOR_GAP_AROUND_TRANSITIONS 1
+
+// Neighbor result struct
+typedef struct {
+    void* left;
+    int32_t left_type;
+    void* right;
+    int32_t right_type;
+} OtioNeighbors;
+
+// Get neighbors of a child at the given index
+OtioNeighbors otio_track_neighbors_of(OtioTrack* track, int32_t child_index,
+                                       int32_t gap_policy, OtioError* err);
 
 // Stack modification operations
 int otio_stack_remove_child(OtioStack* stack, int32_t index, OtioError* err);
@@ -472,6 +522,26 @@ void* otio_stack_get_parent(OtioStack* stack);
 // ----------------------------------------------------------------------------
 
 // Opaque iterator for clip search results
+// ----------------------------------------------------------------------------
+// Track Iterator (for filtered track lists)
+// ----------------------------------------------------------------------------
+
+typedef struct OtioTrackIterator OtioTrackIterator;
+
+// Get filtered tracks from timeline
+OtioTrackIterator* otio_timeline_video_tracks(OtioTimeline* tl);
+OtioTrackIterator* otio_timeline_audio_tracks(OtioTimeline* tl);
+
+// Iterator operations
+int32_t otio_track_iterator_count(OtioTrackIterator* iter);
+OtioTrack* otio_track_iterator_next(OtioTrackIterator* iter);
+void otio_track_iterator_reset(OtioTrackIterator* iter);
+void otio_track_iterator_free(OtioTrackIterator* iter);
+
+// ----------------------------------------------------------------------------
+// Clip Iterator (for clip search)
+// ----------------------------------------------------------------------------
+
 typedef struct OtioClipIterator OtioClipIterator;
 
 // Find all clips in a track (shallow - direct children only)
