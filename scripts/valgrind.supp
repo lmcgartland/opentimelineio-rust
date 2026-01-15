@@ -1,0 +1,51 @@
+# Valgrind suppressions for opentimelineio-rust
+#
+# This file contains suppressions for known/expected memory behaviors that are not
+# actual leaks in our code.
+
+# Suppress C++ standard library static allocations (normal behavior)
+{
+   libstdc++_static
+   Memcheck:Leak
+   ...
+   obj:*/libstdc++*
+}
+
+# Suppress dyld/macOS loader allocations
+{
+   macos_dyld
+   Memcheck:Leak
+   ...
+   obj:*/dyld*
+}
+
+# Suppress pthread static allocations
+{
+   pthread_static
+   Memcheck:Leak
+   ...
+   fun:pthread_*
+}
+
+# Suppress Rust runtime allocations that are held for program lifetime
+{
+   rust_runtime
+   Memcheck:Leak
+   ...
+   fun:*std*thread*
+}
+
+# OpenTimelineIO may have some internal static registries
+{
+   otio_type_registry
+   Memcheck:Leak
+   ...
+   fun:*TypeRegistry*
+}
+
+{
+   otio_schema_registry
+   Memcheck:Leak
+   ...
+   fun:*schema*register*
+}

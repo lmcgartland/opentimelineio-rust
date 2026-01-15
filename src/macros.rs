@@ -124,7 +124,7 @@ macro_rules! impl_children_count {
     };
 }
 
-/// Implements all Track child operations (append/insert clip, gap, stack + remove/clear).
+/// Implements all Track child operations (append/insert clip, gap, stack, transition + remove/clear).
 ///
 /// # Usage
 /// ```ignore
@@ -147,6 +147,10 @@ macro_rules! impl_track_ops {
             append_stack, Stack, otio_track_append_stack,
             "Append a stack to this track (for versioning/alternatives)."
         );
+        crate::macros::impl_append!(
+            append_transition, Transition, otio_track_append_transition,
+            "Append a transition to this track."
+        );
 
         crate::macros::impl_insert!(
             insert_clip, Clip, otio_track_insert_clip,
@@ -159,6 +163,10 @@ macro_rules! impl_track_ops {
         crate::macros::impl_insert!(
             insert_stack, Stack, otio_track_insert_stack,
             "Insert a stack at the given index."
+        );
+        crate::macros::impl_insert!(
+            insert_transition, Transition, otio_track_insert_transition,
+            "Insert a transition at the given index."
         );
 
         crate::macros::impl_children_count!(otio_track_children_count);
@@ -218,11 +226,189 @@ macro_rules! impl_stack_ops {
     };
 }
 
+// ============================================================================
+// Accessor Generation Macros
+// ============================================================================
+
+/// Generates a string getter method that calls an FFI function returning a malloc'd string.
+///
+/// # Usage
+/// ```ignore
+/// impl Marker {
+///     impl_string_getter!(color, otio_marker_get_color, "Get the marker color.");
+/// }
+/// ```
+macro_rules! impl_string_getter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[must_use]
+        pub fn $method(&self) -> String {
+            let ptr = unsafe { crate::ffi::$ffi_fn(self.ptr) };
+            if ptr.is_null() {
+                return String::new();
+            }
+            let result = unsafe {
+                std::ffi::CStr::from_ptr(ptr)
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            unsafe { crate::ffi::otio_free_string(ptr) };
+            result
+        }
+    };
+}
+
+/// Generates a string setter method.
+///
+/// # Usage
+/// ```ignore
+/// impl Marker {
+///     impl_string_setter!(set_color, otio_marker_set_color, "Set the marker color.");
+/// }
+/// ```
+macro_rules! impl_string_setter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        pub fn $method(&mut self, value: &str) {
+            let c_value = std::ffi::CString::new(value).unwrap();
+            unsafe { crate::ffi::$ffi_fn(self.ptr, c_value.as_ptr()) };
+        }
+    };
+}
+
+/// Generates a `TimeRange` getter method.
+///
+/// # Usage
+/// ```ignore
+/// impl Marker {
+///     impl_time_range_getter!(marked_range, otio_marker_get_marked_range, "Get the marked range.");
+/// }
+/// ```
+macro_rules! impl_time_range_getter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[must_use]
+        pub fn $method(&self) -> crate::TimeRange {
+            let ffi_range = unsafe { crate::ffi::$ffi_fn(self.ptr) };
+            crate::TimeRange::new(
+                crate::RationalTime::new(ffi_range.start_time.value, ffi_range.start_time.rate),
+                crate::RationalTime::new(ffi_range.duration.value, ffi_range.duration.rate),
+            )
+        }
+    };
+}
+
+/// Generates a `TimeRange` setter method with error handling.
+///
+/// # Usage
+/// ```ignore
+/// impl Marker {
+///     impl_time_range_setter!(set_marked_range, otio_marker_set_marked_range, "Set the marked range.");
+/// }
+/// ```
+macro_rules! impl_time_range_setter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the range cannot be set.
+        pub fn $method(&mut self, range: crate::TimeRange) -> crate::Result<()> {
+            let mut err = crate::macros::ffi_error!();
+            let result = unsafe { crate::ffi::$ffi_fn(self.ptr, range.into(), &mut err) };
+            if result != 0 {
+                Err(err.into())
+            } else {
+                Ok(())
+            }
+        }
+    };
+}
+
+/// Generates a `RationalTime` getter method.
+macro_rules! impl_rational_time_getter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[must_use]
+        pub fn $method(&self) -> crate::RationalTime {
+            let ffi_rt = unsafe { crate::ffi::$ffi_fn(self.ptr) };
+            crate::RationalTime::new(ffi_rt.value, ffi_rt.rate)
+        }
+    };
+}
+
+/// Generates a `RationalTime` setter method.
+macro_rules! impl_rational_time_setter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        pub fn $method(&mut self, time: crate::RationalTime) {
+            unsafe { crate::ffi::$ffi_fn(self.ptr, time.into()) };
+        }
+    };
+}
+
+/// Generates a bool getter method.
+macro_rules! impl_bool_getter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[must_use]
+        pub fn $method(&self) -> bool {
+            let result = unsafe { crate::ffi::$ffi_fn(self.ptr) };
+            result == 1
+        }
+    };
+}
+
+/// Generates a bool setter method.
+macro_rules! impl_bool_setter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        pub fn $method(&mut self, value: bool) {
+            unsafe { crate::ffi::$ffi_fn(self.ptr, i32::from(value)) };
+        }
+    };
+}
+
+/// Generates a double getter method.
+macro_rules! impl_double_getter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[must_use]
+        pub fn $method(&self) -> f64 {
+            unsafe { crate::ffi::$ffi_fn(self.ptr) }
+        }
+    };
+}
+
+/// Generates a double setter method.
+macro_rules! impl_double_setter {
+    ($method:ident, $ffi_fn:ident, $doc:expr) => {
+        #[doc = $doc]
+        pub fn $method(&mut self, value: f64) {
+            unsafe { crate::ffi::$ffi_fn(self.ptr, value) };
+        }
+    };
+}
+
+// ============================================================================
+// Exports
+// ============================================================================
+
 pub(crate) use ffi_error;
 pub(crate) use impl_append;
+pub(crate) use impl_bool_getter;
+pub(crate) use impl_bool_setter;
 pub(crate) use impl_children_count;
 pub(crate) use impl_clear_children;
+pub(crate) use impl_double_getter;
+pub(crate) use impl_double_setter;
 pub(crate) use impl_insert;
+pub(crate) use impl_rational_time_getter;
+pub(crate) use impl_rational_time_setter;
 pub(crate) use impl_remove_child;
 pub(crate) use impl_stack_ops;
+pub(crate) use impl_string_getter;
+pub(crate) use impl_string_setter;
+pub(crate) use impl_time_range_getter;
+pub(crate) use impl_time_range_setter;
 pub(crate) use impl_track_ops;

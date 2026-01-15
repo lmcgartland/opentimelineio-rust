@@ -79,6 +79,12 @@ fn main() -> otio_rs::Result<()> {
                         Composable::Track(nested_track) => {
                             println!("      [{}] Nested Track: {}", j, nested_track.name());
                         }
+                        Composable::Transition(transition_ref) => {
+                            println!("      [{}] Transition: {} (type: {})",
+                                j,
+                                transition_ref.name(),
+                                transition_ref.transition_type());
+                        }
                     }
                 }
             }
@@ -90,6 +96,9 @@ fn main() -> otio_rs::Result<()> {
             }
             Composable::Stack(stack) => {
                 println!("  [{}] Nested Stack: {}", i, stack.name());
+            }
+            Composable::Transition(transition) => {
+                println!("  [{}] Transition in stack: {}", i, transition.name());
             }
         }
     }

@@ -8,13 +8,20 @@ Rust bindings to [OpenTimelineIO](https://opentimeline.io/) - an open-source API
 
 This crate provides FFI bindings to the C++ OpenTimelineIO library (v0.17.0) via a thin C shim layer.
 
+**Coverage:** ~95% of core types, ~90% of methods
+
 ## Features
 
 - **Timeline creation and manipulation** - Create timelines, tracks, clips, gaps, and stacks
+- **Edit algorithms** - NLE-style editing operations (overwrite, insert, slice, slip, slide, trim, ripple, roll)
 - **Iteration support** - Iterate over children of tracks and stacks with type-safe `Composable` enum
+- **Time transforms** - Convert times between different coordinate spaces in the hierarchy
+- **String serialization** - Serialize/deserialize timelines to/from JSON strings
 - **Builder pattern** - Fluent API for constructing clips, timelines, and references
 - **Metadata support** - Get/set string metadata on all OTIO objects via `HasMetadata` trait
-- **Remove/modify operations** - Insert, remove, and clear children from tracks and stacks
+- **Markers and effects** - Add markers, linear time warps, and freeze frames
+- **Transitions** - Cross-dissolves and other transition types
+- **Media references** - External references, image sequences, generators, and missing references
 - **File I/O** - Read and write `.otio` JSON files
 - **Flexible linking** - Use vendored (bundled) or system-installed OpenTimelineIO
 
@@ -108,6 +115,214 @@ fn main() -> otio_rs::Result<()> {
 }
 ```
 
+## Edit Algorithms
+
+Perform NLE-style editing operations:
+
+```rust
+use otio_rs::{Timeline, Track, Clip, RationalTime, TimeRange};
+
+let mut timeline = Timeline::new("Edit Demo");
+let mut track = timeline.add_video_track("V1");
+
+// Add some clips
+let range = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0));
+track.append_clip(Clip::new("Clip A", range))?;
+track.append_clip(Clip::new("Clip B", range))?;
+track.append_clip(Clip::new("Clip C", range))?;
+
+// Overwrite content at a specific range (3-point edit)
+let new_clip = Clip::new("Insert", range);
+let overwrite_range = TimeRange::new(RationalTime::new(24.0, 24.0), RationalTime::new(24.0, 24.0));
+track.overwrite(new_clip, overwrite_range, false)?;
+
+// Insert at a time, shifting subsequent items
+let insert_clip = Clip::new("Inserted", range);
+track.insert_at_time(insert_clip, RationalTime::new(48.0, 24.0), false)?;
+
+// Slice (split) at a time point
+track.slice_at_time(RationalTime::new(36.0, 24.0), false)?;
+
+// Remove item at time (with optional gap fill)
+track.remove_at_time(RationalTime::new(0.0, 24.0), true)?;
+```
+
+Clip-level edit operations:
+
+```rust
+// Get a mutable clip reference
+let mut clip = Clip::new("My Clip", range);
+
+// Slip: shift media content without changing position/duration
+clip.slip(RationalTime::new(12.0, 24.0))?;
+
+// Slide: move clip position, adjusting adjacent items
+clip.slide(RationalTime::new(-6.0, 24.0))?;
+
+// Trim: adjust in/out points
+clip.trim(
+    RationalTime::new(6.0, 24.0),   // trim in by 6 frames
+    RationalTime::new(-6.0, 24.0),  // trim out by 6 frames
+)?;
+
+// Ripple: adjust duration, shifting subsequent clips
+clip.ripple(
+    RationalTime::new(0.0, 24.0),
+    RationalTime::new(12.0, 24.0),  // extend out by 12 frames
+)?;
+
+// Roll: adjust edit point between adjacent clips
+clip.roll(
+    RationalTime::new(6.0, 24.0),
+    RationalTime::new(0.0, 24.0),
+)?;
+```
+
+## String Serialization
+
+Serialize and deserialize timelines to/from JSON strings:
+
+```rust
+use otio_rs::Timeline;
+
+// Create a timeline
+let timeline = Timeline::new("My Timeline");
+
+// Serialize to JSON string
+let json = timeline.to_json_string()?;
+println!("JSON: {}", json);
+
+// Deserialize from JSON string
+let restored = Timeline::from_json_string(&json)?;
+assert_eq!(restored.name(), "My Timeline");
+```
+
+## Image Sequences
+
+Work with VFX image sequences (EXR, DPX, TIFF, etc.):
+
+```rust
+use otio_rs::{ImageSequenceReference, Clip, RationalTime, TimeRange};
+use otio_rs::image_sequence_reference::MissingFramePolicy;
+
+// Create a reference to an EXR sequence: shot_0001.exr, shot_0002.exr, ...
+let mut seq = ImageSequenceReference::new(
+    "/path/to/render/",  // target_url_base
+    "shot_",             // name_prefix
+    ".exr",              // name_suffix
+    1001,                // start_frame
+    1,                   // frame_step
+    24.0,                // rate (fps)
+    4,                   // frame_zero_padding (e.g., 0001)
+);
+
+seq.set_available_range(TimeRange::new(
+    RationalTime::new(0.0, 24.0),
+    RationalTime::new(100.0, 24.0), // 100 frames
+))?;
+
+seq.set_missing_frame_policy(MissingFramePolicy::Hold);
+
+// Get URL for a specific image
+let url = seq.target_url_for_image_number(0)?; // "/path/to/render/shot_1001.exr"
+
+// Attach to a clip
+let mut clip = Clip::new("VFX Shot", TimeRange::new(
+    RationalTime::new(0.0, 24.0),
+    RationalTime::new(100.0, 24.0),
+));
+clip.set_image_sequence_reference(seq)?;
+```
+
+## Time Transforms
+
+Convert times between different coordinate spaces:
+
+```rust
+use otio_rs::{Timeline, RationalTime, TimeRange};
+
+let timeline = Timeline::read_from_file(std::path::Path::new("input.otio"))?;
+
+// Find clips and get their position in parent
+for clip in timeline.find_clips() {
+    // Get the clip's range in the parent track's coordinate space
+    let range_in_parent = clip.range_in_parent()?;
+    println!("Clip '{}' is at {:?} in parent", clip.name(), range_in_parent);
+}
+```
+
+## Markers
+
+Add markers to clips and tracks:
+
+```rust
+use otio_rs::{Clip, Marker, marker, RationalTime, TimeRange};
+
+let mut clip = Clip::new("My Clip", TimeRange::new(
+    RationalTime::new(0.0, 24.0),
+    RationalTime::new(48.0, 24.0),
+));
+
+// Add markers with different colors
+let marker = Marker::new(
+    "Important moment",
+    TimeRange::new(RationalTime::new(12.0, 24.0), RationalTime::new(1.0, 24.0)),
+    marker::colors::RED,
+);
+clip.add_marker(marker)?;
+
+// Iterate markers
+for marker in clip.markers() {
+    println!("Marker: {} at {:?}", marker.name(), marker.marked_range());
+}
+```
+
+## Effects
+
+Add time effects to clips:
+
+```rust
+use otio_rs::{Clip, LinearTimeWarp, FreezeFrame, RationalTime, TimeRange};
+
+let mut clip = Clip::new("My Clip", TimeRange::new(
+    RationalTime::new(0.0, 24.0),
+    RationalTime::new(48.0, 24.0),
+));
+
+// Add a slow-motion effect (50% speed)
+let slow_mo = LinearTimeWarp::new("Slow Motion", 0.5);
+clip.add_effect(slow_mo)?;
+
+// Or add a freeze frame
+let freeze = FreezeFrame::new("Freeze");
+clip.add_effect(freeze)?;
+```
+
+## Transitions
+
+Add transitions between clips:
+
+```rust
+use otio_rs::{Track, Clip, Transition, RationalTime, TimeRange};
+use otio_rs::transition::TransitionType;
+
+let mut track = Track::new_video("V1");
+let range = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0));
+
+track.append_clip(Clip::new("Clip A", range))?;
+
+// Add a 12-frame cross dissolve
+let transition = Transition::new(
+    "Dissolve",
+    TransitionType::SMPTE_Dissolve,
+    RationalTime::new(6.0, 24.0),  // in_offset
+    RationalTime::new(6.0, 24.0),  // out_offset
+);
+track.append_transition(transition)?;
+
+track.append_clip(Clip::new("Clip B", range))?;
+```
+
 ## Builder Pattern
 
 Use builders for a fluent construction API:
@@ -156,6 +371,7 @@ for child in timeline.tracks().children() {
                     Composable::Gap(gap) => println!("  Gap: {}", gap.name()),
                     Composable::Stack(stack) => println!("  Stack: {}", stack.name()),
                     Composable::Track(track) => println!("  Track: {}", track.name()),
+                    Composable::Transition(trans) => println!("  Transition: {}", trans.name()),
                 }
             }
         }
@@ -234,7 +450,11 @@ The first build will take several minutes as it compiles the OpenTimelineIO C++ 
 ### 3. Run Tests
 
 ```bash
+# Run all tests
 cargo test
+
+# Run memory stress tests (for leak detection)
+cargo test --test memory -- --ignored --test-threads=1
 ```
 
 ### 4. Run Examples
@@ -246,33 +466,118 @@ cargo run --example modify     # Insert/remove operations
 cargo run --example builder    # Builder pattern demo
 ```
 
-## Architecture
+## Memory Leak Testing
+
+The library includes stress tests for memory leak detection:
+
+```bash
+# Run stress tests (requires valgrind on Linux)
+./scripts/check_memory.sh
+
+# Or run manually
+cargo test --test memory -- --ignored --test-threads=1
+```
+
+## How It Works
+
+### Binding Architecture
+
+This library uses a three-layer binding approach:
+
+```
++-------------------------------------+
+|         Rust Safe API               |  <- src/lib.rs, builders.rs, iterators.rs
+|    (Timeline, Clip, Track, etc.)    |
++-------------------------------------+
+|        Generated FFI Bindings       |  <- bindgen output (build.rs)
+|     (otio_timeline_create, etc.)    |
++-------------------------------------+
+|           C Shim Layer              |  <- shim/otio_shim.h + otio_shim.cpp
+|     (extern "C" wrapper functions)  |
++-------------------------------------+
+|      OpenTimelineIO C++ Library     |  <- vendor/OpenTimelineIO
+|   (otio::Timeline, otio::Clip...)   |
++-------------------------------------+
+```
+
+**Why a C shim?** OpenTimelineIO is a C++ library with templates, inheritance, and smart pointers. Rust's `bindgen` can only generate bindings to C APIs. The shim layer:
+- Exposes a pure C API with opaque pointer handles
+- Catches C++ exceptions and converts them to error codes
+- Manages memory ownership explicitly
+
+### Memory Ownership
+
+Objects follow clear ownership rules across the FFI boundary:
+
+| Scenario | Ownership |
+|----------|-----------|
+| `Timeline::new()` | Rust owns the Timeline |
+| `timeline.add_video_track()` | Timeline owns the Track (returns non-owning handle) |
+| `Clip::new()` | Rust owns the Clip |
+| `track.append_clip(clip)` | Track takes ownership (Clip consumed via `mem::forget`) |
+| Iterator items (`ClipRef`, `TrackRef`) | Non-owning references (lifetime tied to parent) |
+
+When appending/inserting children, ownership transfers to C++ and Rust's destructor is bypassed:
+
+```rust
+pub fn append_clip(&mut self, child: Clip) -> Result<()> {
+    // ... FFI call transfers ownership to C++ ...
+    std::mem::forget(child);  // Don't run Rust Drop
+    Ok(())
+}
+```
+
+### Thread Safety
+
+Types implement `Send` but not `Sync`:
+- **Safe:** Moving a Timeline to another thread
+- **Unsafe:** Sharing a Timeline between threads simultaneously
+
+Use `Arc<Mutex<Timeline>>` for shared access across threads.
+
+## Project Structure
 
 ```
 otio-rs/
 ├── Cargo.toml          # Rust package manifest
 ├── build.rs            # Build script (CMake + bindgen)
 ├── src/
-│   ├── lib.rs          # Safe Rust wrappers
+│   ├── lib.rs          # Core types (Timeline, Track, Clip, Gap, Stack)
 │   ├── types.rs        # Type aliases (Result)
 │   ├── traits.rs       # HasMetadata trait
-│   ├── iterators.rs    # Iteration support
-│   └── builders.rs     # Builder pattern
+│   ├── iterators.rs    # Iteration support (Composable enum, *Ref types)
+│   ├── builders.rs     # Builder pattern (ClipBuilder, TimelineBuilder)
+│   ├── macros.rs       # Internal macros reducing FFI boilerplate
+│   ├── marker.rs       # Marker type and color constants
+│   ├── effect.rs       # Effect wrapper
+│   ├── time_effect.rs  # LinearTimeWarp, FreezeFrame
+│   ├── transition.rs   # Transition type
+│   ├── image_sequence_reference.rs  # VFX image sequences
+│   ├── generator_reference.rs       # Synthetic media generators
+│   └── missing_reference.rs         # Placeholder for missing media
 ├── shim/
-│   ├── otio_shim.h     # C interface header
-│   ├── otio_shim.cpp   # C++ implementation
+│   ├── otio_shim.h     # C interface header (~400 functions)
+│   ├── otio_shim.cpp   # C++ implementation wrapping OTIO
 │   └── CMakeLists.txt  # CMake build configuration
 ├── vendor/
 │   └── OpenTimelineIO/ # Git submodule (v0.17.0)
+├── scripts/
+│   ├── check_memory.sh # Valgrind memory leak detection
+│   └── valgrind.supp   # Valgrind suppressions
 ├── examples/
 │   ├── dummy.rs        # Basic usage
 │   ├── iterate.rs      # Iteration example
-│   ├── modify.rs       # Modify operations
+│   ├── modify.rs       # Insert/remove operations
 │   └── builder.rs      # Builder pattern
 └── tests/
-    ├── roundtrip.rs    # File I/O tests
-    ├── metadata.rs     # Metadata tests
-    └── nested.rs       # Nested structure tests
+    ├── extended_features.rs  # Comprehensive feature tests
+    ├── memory.rs             # Memory leak stress tests
+    ├── roundtrip.rs          # File I/O tests
+    ├── metadata.rs           # Metadata tests
+    ├── nested.rs             # Nested structure tests
+    ├── iteration.rs          # Iteration tests
+    ├── modify_operations.rs  # Insert/remove tests
+    └── builders.rs           # Builder pattern tests
 ```
 
 ## Troubleshooting
