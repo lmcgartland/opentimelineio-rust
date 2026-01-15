@@ -62,12 +62,17 @@ void otio_timeline_free(OtioTimeline* tl) {
     }
 }
 
-void otio_timeline_set_global_start_time(OtioTimeline* tl, OtioRationalTime time) {
+int otio_timeline_set_global_start_time(OtioTimeline* tl, OtioRationalTime time, OtioError* err) {
     try {
         auto timeline = reinterpret_cast<otio::Timeline*>(tl);
         timeline->set_global_start_time(to_otio_rt(time));
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
     } catch (...) {
-        // Ignore
+        set_error(err, 1, "Unknown exception");
+        return -1;
     }
 }
 
@@ -136,13 +141,18 @@ OtioClip* otio_clip_create(const char* name, OtioTimeRange source_range) {
     }
 }
 
-void otio_clip_set_media_reference(OtioClip* clip, OtioExternalRef* ref) {
+int otio_clip_set_media_reference(OtioClip* clip, OtioExternalRef* ref, OtioError* err) {
     try {
         auto c = reinterpret_cast<otio::Clip*>(clip);
         auto r = reinterpret_cast<otio::ExternalReference*>(ref);
         c->set_media_reference(r);
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
     } catch (...) {
-        // Ignore
+        set_error(err, 1, "Unknown exception");
+        return -1;
     }
 }
 
@@ -209,12 +219,17 @@ OtioExternalRef* otio_external_ref_create(const char* target_url) {
     }
 }
 
-void otio_external_ref_set_available_range(OtioExternalRef* ref, OtioTimeRange range) {
+int otio_external_ref_set_available_range(OtioExternalRef* ref, OtioTimeRange range, OtioError* err) {
     try {
         auto r = reinterpret_cast<otio::ExternalReference*>(ref);
         r->set_available_range(to_otio_tr(range));
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
     } catch (...) {
-        // Ignore
+        set_error(err, 1, "Unknown exception");
+        return -1;
     }
 }
 
@@ -268,18 +283,16 @@ OtioTimeline* otio_timeline_read_from_file(const char* path, OtioError* err) {
 
 } // end extern "C" for basic functions
 
-// Helper for getting metadata string - uses thread_local buffer
-static thread_local std::string g_metadata_buffer;
-
+// Helper for getting metadata string - returns malloc'd string (caller must free)
 template<typename T>
-static const char* get_metadata_string_impl(T* obj, const char* key) {
+static char* get_metadata_string_impl(T* obj, const char* key) {
     try {
         auto& meta = obj->metadata();
         auto it = meta.find(std::string(key));
         if (it != meta.end()) {
             if (it->second.type() == typeid(std::string)) {
-                g_metadata_buffer = std::any_cast<std::string>(it->second);
-                return g_metadata_buffer.c_str();
+                const std::string& value = std::any_cast<const std::string&>(it->second);
+                return strdup(value.c_str());
             }
         }
         return nullptr;
@@ -299,13 +312,18 @@ static void set_metadata_string_impl(T* obj, const char* key, const char* value)
 
 extern "C" {
 
+// String memory management
+void otio_free_string(char* str) {
+    free(str);
+}
+
 // Timeline metadata
 void otio_timeline_set_metadata_string(OtioTimeline* tl, const char* key, const char* value) {
     auto timeline = reinterpret_cast<otio::Timeline*>(tl);
     set_metadata_string_impl(timeline, key, value);
 }
 
-const char* otio_timeline_get_metadata_string(OtioTimeline* tl, const char* key) {
+char* otio_timeline_get_metadata_string(OtioTimeline* tl, const char* key) {
     auto timeline = reinterpret_cast<otio::Timeline*>(tl);
     return get_metadata_string_impl(timeline, key);
 }
@@ -316,7 +334,7 @@ void otio_track_set_metadata_string(OtioTrack* track, const char* key, const cha
     set_metadata_string_impl(t, key, value);
 }
 
-const char* otio_track_get_metadata_string(OtioTrack* track, const char* key) {
+char* otio_track_get_metadata_string(OtioTrack* track, const char* key) {
     auto t = reinterpret_cast<otio::Track*>(track);
     return get_metadata_string_impl(t, key);
 }
@@ -327,7 +345,7 @@ void otio_clip_set_metadata_string(OtioClip* clip, const char* key, const char* 
     set_metadata_string_impl(c, key, value);
 }
 
-const char* otio_clip_get_metadata_string(OtioClip* clip, const char* key) {
+char* otio_clip_get_metadata_string(OtioClip* clip, const char* key) {
     auto c = reinterpret_cast<otio::Clip*>(clip);
     return get_metadata_string_impl(c, key);
 }
@@ -338,7 +356,7 @@ void otio_gap_set_metadata_string(OtioGap* gap, const char* key, const char* val
     set_metadata_string_impl(g, key, value);
 }
 
-const char* otio_gap_get_metadata_string(OtioGap* gap, const char* key) {
+char* otio_gap_get_metadata_string(OtioGap* gap, const char* key) {
     auto g = reinterpret_cast<otio::Gap*>(gap);
     return get_metadata_string_impl(g, key);
 }
@@ -349,7 +367,7 @@ void otio_stack_set_metadata_string(OtioStack* stack, const char* key, const cha
     set_metadata_string_impl(s, key, value);
 }
 
-const char* otio_stack_get_metadata_string(OtioStack* stack, const char* key) {
+char* otio_stack_get_metadata_string(OtioStack* stack, const char* key) {
     auto s = reinterpret_cast<otio::Stack*>(stack);
     return get_metadata_string_impl(s, key);
 }
@@ -360,7 +378,7 @@ void otio_external_ref_set_metadata_string(OtioExternalRef* ref, const char* key
     set_metadata_string_impl(r, key, value);
 }
 
-const char* otio_external_ref_get_metadata_string(OtioExternalRef* ref, const char* key) {
+char* otio_external_ref_get_metadata_string(OtioExternalRef* ref, const char* key) {
     auto r = reinterpret_cast<otio::ExternalReference*>(ref);
     return get_metadata_string_impl(r, key);
 }
@@ -486,6 +504,361 @@ int otio_track_append_stack(OtioTrack* track, OtioStack* stack, OtioError* err) 
             set_error(err, 1, status.full_description.c_str());
             return -1;
         }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+// Track iteration
+int32_t otio_track_children_count(OtioTrack* track) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        return static_cast<int32_t>(t->children().size());
+    } catch (...) {
+        return 0;
+    }
+}
+
+int32_t otio_track_child_type(OtioTrack* track, int32_t index) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto& children = t->children();
+        if (index < 0 || static_cast<size_t>(index) >= children.size()) {
+            return -1;
+        }
+        auto child = children[index].value;
+        if (dynamic_cast<otio::Clip*>(child)) return OTIO_CHILD_TYPE_CLIP;
+        if (dynamic_cast<otio::Gap*>(child)) return OTIO_CHILD_TYPE_GAP;
+        if (dynamic_cast<otio::Stack*>(child)) return OTIO_CHILD_TYPE_STACK;
+        if (dynamic_cast<otio::Track*>(child)) return OTIO_CHILD_TYPE_TRACK;
+        return -1;
+    } catch (...) {
+        return -1;
+    }
+}
+
+void* otio_track_child_at(OtioTrack* track, int32_t index) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto& children = t->children();
+        if (index < 0 || static_cast<size_t>(index) >= children.size()) {
+            return nullptr;
+        }
+        return children[index].value;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+// Stack iteration
+int32_t otio_stack_children_count(OtioStack* stack) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        return static_cast<int32_t>(s->children().size());
+    } catch (...) {
+        return 0;
+    }
+}
+
+int32_t otio_stack_child_type(OtioStack* stack, int32_t index) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto& children = s->children();
+        if (index < 0 || static_cast<size_t>(index) >= children.size()) {
+            return -1;
+        }
+        auto child = children[index].value;
+        if (dynamic_cast<otio::Clip*>(child)) return OTIO_CHILD_TYPE_CLIP;
+        if (dynamic_cast<otio::Gap*>(child)) return OTIO_CHILD_TYPE_GAP;
+        if (dynamic_cast<otio::Stack*>(child)) return OTIO_CHILD_TYPE_STACK;
+        if (dynamic_cast<otio::Track*>(child)) return OTIO_CHILD_TYPE_TRACK;
+        return -1;
+    } catch (...) {
+        return -1;
+    }
+}
+
+void* otio_stack_child_at(OtioStack* stack, int32_t index) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto& children = s->children();
+        if (index < 0 || static_cast<size_t>(index) >= children.size()) {
+            return nullptr;
+        }
+        return children[index].value;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+// Name accessors
+char* otio_clip_get_name(OtioClip* clip) {
+    try {
+        auto c = reinterpret_cast<otio::Clip*>(clip);
+        return strdup(c->name().c_str());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char* otio_gap_get_name(OtioGap* gap) {
+    try {
+        auto g = reinterpret_cast<otio::Gap*>(gap);
+        return strdup(g->name().c_str());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char* otio_track_get_name(OtioTrack* track) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        return strdup(t->name().c_str());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char* otio_stack_get_name(OtioStack* stack) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        return strdup(s->name().c_str());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+// Source range accessor
+OtioTimeRange otio_clip_get_source_range(OtioClip* clip) {
+    try {
+        auto c = reinterpret_cast<otio::Clip*>(clip);
+        auto sr = c->source_range();
+        if (sr.has_value()) {
+            auto& range = sr.value();
+            return OtioTimeRange{
+                OtioRationalTime{range.start_time().value(), range.start_time().rate()},
+                OtioRationalTime{range.duration().value(), range.duration().rate()}
+            };
+        }
+    } catch (...) {
+    }
+    // Return zero range on error
+    return OtioTimeRange{OtioRationalTime{0, 1}, OtioRationalTime{0, 1}};
+}
+
+// Track modification operations
+int otio_track_remove_child(OtioTrack* track, int32_t index, OtioError* err) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto& children = t->children();
+        if (index < 0 || static_cast<size_t>(index) >= children.size()) {
+            set_error(err, 1, "Index out of bounds");
+            return -1;
+        }
+        otio::ErrorStatus status;
+        t->remove_child(index, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_track_insert_clip(OtioTrack* track, int32_t index, OtioClip* clip, OtioError* err) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto c = reinterpret_cast<otio::Clip*>(clip);
+        otio::ErrorStatus status;
+        t->insert_child(index, c, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_track_insert_gap(OtioTrack* track, int32_t index, OtioGap* gap, OtioError* err) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto g = reinterpret_cast<otio::Gap*>(gap);
+        otio::ErrorStatus status;
+        t->insert_child(index, g, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_track_insert_stack(OtioTrack* track, int32_t index, OtioStack* stack, OtioError* err) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        otio::ErrorStatus status;
+        t->insert_child(index, s, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_track_clear_children(OtioTrack* track, OtioError* err) {
+    try {
+        auto t = reinterpret_cast<otio::Track*>(track);
+        t->clear_children();
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+// Stack modification operations
+int otio_stack_remove_child(OtioStack* stack, int32_t index, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto& children = s->children();
+        if (index < 0 || static_cast<size_t>(index) >= children.size()) {
+            set_error(err, 1, "Index out of bounds");
+            return -1;
+        }
+        otio::ErrorStatus status;
+        s->remove_child(index, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_insert_track(OtioStack* stack, int32_t index, OtioTrack* track, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto t = reinterpret_cast<otio::Track*>(track);
+        otio::ErrorStatus status;
+        s->insert_child(index, t, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_insert_clip(OtioStack* stack, int32_t index, OtioClip* clip, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto c = reinterpret_cast<otio::Clip*>(clip);
+        otio::ErrorStatus status;
+        s->insert_child(index, c, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_insert_gap(OtioStack* stack, int32_t index, OtioGap* gap, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto g = reinterpret_cast<otio::Gap*>(gap);
+        otio::ErrorStatus status;
+        s->insert_child(index, g, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_insert_stack(OtioStack* stack, int32_t index, OtioStack* child, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        auto c = reinterpret_cast<otio::Stack*>(child);
+        otio::ErrorStatus status;
+        s->insert_child(index, c, &status);
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+        return 0;
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return -1;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return -1;
+    }
+}
+
+int otio_stack_clear_children(OtioStack* stack, OtioError* err) {
+    try {
+        auto s = reinterpret_cast<otio::Stack*>(stack);
+        s->clear_children();
         return 0;
     } catch (const std::exception& e) {
         set_error(err, 1, e.what());

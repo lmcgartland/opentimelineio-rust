@@ -16,13 +16,19 @@ readme = "README.md"
 [build-dependencies]
 bindgen = "0.69"
 cmake = "0.1"
+pkg-config = { version = "0.3", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
 tempfile = "3.10"
 
 [features]
-default = []
+# Default to vendored OTIO (bundled OpenTimelineIO)
+default = ["vendored"]
+# Use bundled OpenTimelineIO (builds from source)
+vendored = []
+# Use system-installed OpenTimelineIO via pkg-config
+system = ["pkg-config"]
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

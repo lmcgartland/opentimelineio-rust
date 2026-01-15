@@ -5,7 +5,7 @@ use tempfile::NamedTempFile;
 #[test]
 fn test_stack_composition() {
     let mut timeline = Timeline::new("Stack Test Timeline");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     // Create a stack with multiple clips (like a clip stack for compositing)
     let mut stack = Stack::new("Clip Stack");
@@ -50,7 +50,7 @@ fn test_stack_composition() {
 #[test]
 fn test_deep_stack_nesting() {
     let mut timeline = Timeline::new("Deep Nesting Timeline");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     // Create innermost clips
     let inner_range = TimeRange::new(
@@ -104,7 +104,7 @@ fn test_deep_stack_nesting() {
 #[test]
 fn test_stack_in_track() {
     let mut timeline = Timeline::new("Versioning Timeline");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     let mut track = timeline.add_video_track("Main Track");
 
@@ -166,7 +166,7 @@ fn test_stack_in_track() {
 #[test]
 fn test_standalone_tracks_in_stack() {
     let mut timeline = Timeline::new("Standalone Tracks Test");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     // Create a stack to hold multiple tracks
     let mut main_stack = Stack::new("Main Stack");
@@ -220,7 +220,7 @@ fn test_standalone_tracks_in_stack() {
 #[test]
 fn test_nested_stacks() {
     let mut timeline = Timeline::new("Nested Stacks Timeline");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     let range = TimeRange::new(
         RationalTime::new(0.0, 24.0),
@@ -271,7 +271,7 @@ fn test_nested_stacks() {
 #[test]
 fn test_timeline_tracks_accessor() {
     let mut timeline = Timeline::new("Tracks Accessor Test");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     // Add some tracks
     let mut v1 = timeline.add_video_track("V1");

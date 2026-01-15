@@ -100,7 +100,7 @@ fn test_external_ref_metadata() {
 #[test]
 fn test_metadata_roundtrip() {
     let mut timeline = Timeline::new("Roundtrip Metadata Test");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     // Set timeline metadata
     timeline.set_metadata("project_id", "proj_roundtrip");

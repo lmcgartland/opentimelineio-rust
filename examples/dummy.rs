@@ -1,10 +1,10 @@
-use otio_rs::{Clip, ExternalReference, Gap, RationalTime, TimeRange, Timeline};
+use otio_rs::{Clip, ExternalReference, Gap, HasMetadata, RationalTime, TimeRange, Timeline};
 use std::path::Path;
 
 fn main() -> otio_rs::Result<()> {
     // Create a timeline
     let mut timeline = Timeline::new("My Project");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0))?;
 
     // Add video track with clips
     let mut v1 = timeline.add_video_track("V1");
@@ -18,8 +18,8 @@ fn main() -> otio_rs::Result<()> {
     ref1.set_available_range(TimeRange::new(
         RationalTime::new(0.0, 24.0),
         RationalTime::new(720.0, 24.0), // 30 seconds
-    ));
-    clip1.set_media_reference(ref1);
+    ))?;
+    clip1.set_media_reference(ref1)?;
     v1.append_clip(clip1)?;
 
     // Gap: 1 second
@@ -35,8 +35,8 @@ fn main() -> otio_rs::Result<()> {
     ref2.set_available_range(TimeRange::new(
         RationalTime::new(0.0, 24.0),
         RationalTime::new(480.0, 24.0), // 20 seconds
-    ));
-    clip2.set_media_reference(ref2);
+    ))?;
+    clip2.set_media_reference(ref2)?;
     v1.append_clip(clip2)?;
 
     // Add audio track

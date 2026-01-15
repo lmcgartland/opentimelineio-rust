@@ -9,7 +9,7 @@
 //! use otio_rs::{Timeline, Track, Clip, RationalTime, TimeRange};
 //!
 //! let mut timeline = Timeline::new("My Timeline");
-//! timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+//! timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 //!
 //! let mut video_track = timeline.add_video_track("V1");
 //!
@@ -33,8 +33,19 @@ mod ffi {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
+mod traits;
+pub use traits::HasMetadata;
+
 mod types;
 pub use types::*;
+
+mod iterators;
+pub use iterators::{
+    ClipRef, Composable, GapRef, StackChildIter, StackRef, TrackChildIter, TrackRef,
+};
+
+mod builders;
+pub use builders::{ClipBuilder, ExternalReferenceBuilder, TimelineBuilder};
 
 use std::ffi::{CStr, CString};
 use std::path::Path;
@@ -158,8 +169,22 @@ impl Timeline {
     }
 
     /// Set the global start time of the timeline.
-    pub fn set_global_start_time(&mut self, time: RationalTime) {
-        unsafe { ffi::otio_timeline_set_global_start_time(self.ptr, time.into()) }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the global start time cannot be set.
+    pub fn set_global_start_time(&mut self, time: RationalTime) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_timeline_set_global_start_time(self.ptr, time.into(), &mut err) };
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
     }
 
     /// Add a video track to the timeline.
@@ -220,33 +245,15 @@ impl Timeline {
     /// Get the root stack (tracks container) for this timeline.
     ///
     /// The returned `StackRef` is a non-owning reference to the timeline's stack.
+    /// Use `tracks().children()` to iterate over the tracks.
     #[must_use]
     pub fn tracks(&self) -> StackRef<'_> {
         let ptr = unsafe { ffi::otio_timeline_get_tracks(self.ptr) };
-        StackRef { ptr, _marker: std::marker::PhantomData }
-    }
-
-    /// Set a string metadata value on this timeline.
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let c_key = CString::new(key).unwrap();
-        let c_value = CString::new(value).unwrap();
-        unsafe { ffi::otio_timeline_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
-    }
-
-    /// Get a string metadata value from this timeline.
-    ///
-    /// Returns `None` if the key doesn't exist.
-    #[must_use]
-    pub fn get_metadata(&self, key: &str) -> Option<String> {
-        let c_key = CString::new(key).unwrap();
-        let ptr = unsafe { ffi::otio_timeline_get_metadata_string(self.ptr, c_key.as_ptr()) };
-        if ptr.is_null() {
-            None
-        } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
-        }
+        StackRef::new(ptr)
     }
 }
+
+traits::impl_has_metadata!(Timeline, otio_timeline_set_metadata_string, otio_timeline_get_metadata_string);
 
 impl Drop for Timeline {
     fn drop(&mut self) {
@@ -346,27 +353,122 @@ impl Track {
         }
     }
 
-    /// Set a string metadata value on this track.
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let c_key = CString::new(key).unwrap();
-        let c_value = CString::new(value).unwrap();
-        unsafe { ffi::otio_track_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    /// Get the number of children in this track.
+    #[must_use]
+    pub fn children_count(&self) -> usize {
+        let count = unsafe { ffi::otio_track_children_count(self.ptr) };
+        count.max(0) as usize
     }
 
-    /// Get a string metadata value from this track.
+    /// Iterate over children of this track.
     ///
-    /// Returns `None` if the key doesn't exist.
-    #[must_use]
-    pub fn get_metadata(&self, key: &str) -> Option<String> {
-        let c_key = CString::new(key).unwrap();
-        let ptr = unsafe { ffi::otio_track_get_metadata_string(self.ptr, c_key.as_ptr()) };
-        if ptr.is_null() {
-            None
+    /// Returns an iterator of `Composable` items (clips, gaps, stacks).
+    pub fn children(&self) -> TrackChildIter<'_> {
+        TrackChildIter::new(self.ptr)
+    }
+
+    /// Remove a child at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index is out of bounds.
+    pub fn remove_child(&mut self, index: usize) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_track_remove_child(self.ptr, index as i32, &mut err) };
+        if result != 0 {
+            Err(err.into())
         } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+            Ok(())
+        }
+    }
+
+    /// Insert a clip at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clip cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_clip(&mut self, index: usize, clip: Clip) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_track_insert_clip(self.ptr, index as i32, clip.ptr, &mut err) };
+        std::mem::forget(clip);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Insert a gap at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the gap cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_gap(&mut self, index: usize, gap: Gap) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_track_insert_gap(self.ptr, index as i32, gap.ptr, &mut err) };
+        std::mem::forget(gap);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Insert a stack at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stack cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_stack(&mut self, index: usize, stack: Stack) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_track_insert_stack(self.ptr, index as i32, stack.ptr, &mut err) };
+        std::mem::forget(stack);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Clear all children from this track.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the children cannot be cleared.
+    pub fn clear_children(&mut self) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_track_clear_children(self.ptr, &mut err) };
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
         }
     }
 }
+
+traits::impl_has_metadata!(Track, otio_track_set_metadata_string, otio_track_get_metadata_string);
 
 impl Drop for Track {
     fn drop(&mut self) {
@@ -394,33 +496,28 @@ impl Clip {
     }
 
     /// Set the media reference for this clip.
-    #[allow(clippy::forget_non_drop)] // Reference ownership transfers to C++
-    pub fn set_media_reference(&mut self, reference: ExternalReference) {
-        unsafe { ffi::otio_clip_set_media_reference(self.ptr, reference.ptr) }
-        std::mem::forget(reference); // Clip now owns the reference
-    }
-
-    /// Set a string metadata value on this clip.
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let c_key = CString::new(key).unwrap();
-        let c_value = CString::new(value).unwrap();
-        unsafe { ffi::otio_clip_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
-    }
-
-    /// Get a string metadata value from this clip.
     ///
-    /// Returns `None` if the key doesn't exist.
-    #[must_use]
-    pub fn get_metadata(&self, key: &str) -> Option<String> {
-        let c_key = CString::new(key).unwrap();
-        let ptr = unsafe { ffi::otio_clip_get_metadata_string(self.ptr, c_key.as_ptr()) };
-        if ptr.is_null() {
-            None
+    /// # Errors
+    ///
+    /// Returns an error if the media reference cannot be set.
+    #[allow(clippy::forget_non_drop)] // Reference ownership transfers to C++
+    pub fn set_media_reference(&mut self, reference: ExternalReference) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_clip_set_media_reference(self.ptr, reference.ptr, &mut err) };
+        std::mem::forget(reference); // Clip now owns the reference
+        if result != 0 {
+            Err(err.into())
         } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+            Ok(())
         }
     }
 }
+
+traits::impl_has_metadata!(Clip, otio_clip_set_metadata_string, otio_clip_get_metadata_string);
 
 /// A gap represents empty space in a track.
 pub struct Gap {
@@ -434,28 +531,9 @@ impl Gap {
         let ptr = unsafe { ffi::otio_gap_create(duration.into()) };
         Self { ptr }
     }
-
-    /// Set a string metadata value on this gap.
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let c_key = CString::new(key).unwrap();
-        let c_value = CString::new(value).unwrap();
-        unsafe { ffi::otio_gap_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
-    }
-
-    /// Get a string metadata value from this gap.
-    ///
-    /// Returns `None` if the key doesn't exist.
-    #[must_use]
-    pub fn get_metadata(&self, key: &str) -> Option<String> {
-        let c_key = CString::new(key).unwrap();
-        let ptr = unsafe { ffi::otio_gap_get_metadata_string(self.ptr, c_key.as_ptr()) };
-        if ptr.is_null() {
-            None
-        } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
-        }
-    }
 }
+
+traits::impl_has_metadata!(Gap, otio_gap_set_metadata_string, otio_gap_get_metadata_string);
 
 /// An external reference points to a media file.
 pub struct ExternalReference {
@@ -472,31 +550,26 @@ impl ExternalReference {
     }
 
     /// Set the available range for this media reference.
-    pub fn set_available_range(&mut self, range: TimeRange) {
-        unsafe { ffi::otio_external_ref_set_available_range(self.ptr, range.into()) }
-    }
-
-    /// Set a string metadata value on this external reference.
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let c_key = CString::new(key).unwrap();
-        let c_value = CString::new(value).unwrap();
-        unsafe { ffi::otio_external_ref_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
-    }
-
-    /// Get a string metadata value from this external reference.
     ///
-    /// Returns `None` if the key doesn't exist.
-    #[must_use]
-    pub fn get_metadata(&self, key: &str) -> Option<String> {
-        let c_key = CString::new(key).unwrap();
-        let ptr = unsafe { ffi::otio_external_ref_get_metadata_string(self.ptr, c_key.as_ptr()) };
-        if ptr.is_null() {
-            None
+    /// # Errors
+    ///
+    /// Returns an error if the available range cannot be set.
+    pub fn set_available_range(&mut self, range: TimeRange) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_external_ref_set_available_range(self.ptr, range.into(), &mut err) };
+        if result != 0 {
+            Err(err.into())
         } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+            Ok(())
         }
     }
 }
+
+traits::impl_has_metadata!(ExternalReference, otio_external_ref_set_metadata_string, otio_external_ref_get_metadata_string);
 
 /// A stack is a composition that layers its children.
 ///
@@ -597,27 +670,143 @@ impl Stack {
         }
     }
 
-    /// Set a string metadata value on this stack.
-    pub fn set_metadata(&mut self, key: &str, value: &str) {
-        let c_key = CString::new(key).unwrap();
-        let c_value = CString::new(value).unwrap();
-        unsafe { ffi::otio_stack_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    /// Get the number of children in this stack.
+    #[must_use]
+    pub fn children_count(&self) -> usize {
+        let count = unsafe { ffi::otio_stack_children_count(self.ptr) };
+        count.max(0) as usize
     }
 
-    /// Get a string metadata value from this stack.
+    /// Iterate over children of this stack.
     ///
-    /// Returns `None` if the key doesn't exist.
-    #[must_use]
-    pub fn get_metadata(&self, key: &str) -> Option<String> {
-        let c_key = CString::new(key).unwrap();
-        let ptr = unsafe { ffi::otio_stack_get_metadata_string(self.ptr, c_key.as_ptr()) };
-        if ptr.is_null() {
-            None
+    /// Returns an iterator of `Composable` items (clips, gaps, stacks, tracks).
+    pub fn children(&self) -> StackChildIter<'_> {
+        StackChildIter::new(self.ptr)
+    }
+
+    /// Remove a child at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index is out of bounds.
+    pub fn remove_child(&mut self, index: usize) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_stack_remove_child(self.ptr, index as i32, &mut err) };
+        if result != 0 {
+            Err(err.into())
         } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+            Ok(())
+        }
+    }
+
+    /// Insert a track at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the track cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_track(&mut self, index: usize, track: Track) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_stack_insert_track(self.ptr, index as i32, track.ptr, &mut err) };
+        std::mem::forget(track);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Insert a clip at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the clip cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_clip(&mut self, index: usize, clip: Clip) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_stack_insert_clip(self.ptr, index as i32, clip.ptr, &mut err) };
+        std::mem::forget(clip);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Insert a gap at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the gap cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_gap(&mut self, index: usize, gap: Gap) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_stack_insert_gap(self.ptr, index as i32, gap.ptr, &mut err) };
+        std::mem::forget(gap);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Insert a child stack at the given index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stack cannot be inserted.
+    #[allow(clippy::forget_non_drop)]
+    pub fn insert_stack(&mut self, index: usize, child: Stack) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result =
+            unsafe { ffi::otio_stack_insert_stack(self.ptr, index as i32, child.ptr, &mut err) };
+        std::mem::forget(child);
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Clear all children from this stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the children cannot be cleared.
+    pub fn clear_children(&mut self) -> Result<()> {
+        let mut err = ffi::OtioError {
+            code: 0,
+            message: [0; 256],
+        };
+        let result = unsafe { ffi::otio_stack_clear_children(self.ptr, &mut err) };
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
         }
     }
 }
+
+traits::impl_has_metadata!(Stack, otio_stack_set_metadata_string, otio_stack_get_metadata_string);
 
 impl Drop for Stack {
     fn drop(&mut self) {
@@ -627,22 +816,3 @@ impl Drop for Stack {
 
 // Safety: Stack is safe to send between threads
 unsafe impl Send for Stack {}
-
-/// A non-owning reference to a stack.
-///
-/// This is returned by `Timeline::tracks()` and does not own its memory.
-pub struct StackRef<'a> {
-    ptr: *mut ffi::OtioStack,
-    _marker: std::marker::PhantomData<&'a ()>,
-}
-
-impl StackRef<'_> {
-    /// Get the raw pointer to the stack.
-    ///
-    /// This is useful for advanced use cases where you need to pass the stack
-    /// to FFI functions directly.
-    #[must_use]
-    pub fn as_ptr(&self) -> *mut ffi::OtioStack {
-        self.ptr
-    }
-}

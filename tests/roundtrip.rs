@@ -4,7 +4,7 @@ use tempfile::NamedTempFile;
 #[test]
 fn test_create_simple_timeline() {
     let mut timeline = Timeline::new("Test Timeline");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0)).unwrap();
 
     let mut video_track = timeline.add_video_track("V1");
 
@@ -18,8 +18,8 @@ fn test_create_simple_timeline() {
     media_ref.set_available_range(TimeRange::new(
         RationalTime::new(0.0, 24.0),
         RationalTime::new(240.0, 24.0), // 10 seconds total
-    ));
-    clip.set_media_reference(media_ref);
+    )).unwrap();
+    clip.set_media_reference(media_ref).unwrap();
 
     video_track.append_clip(clip).expect("Failed to append clip");
 
