@@ -81,7 +81,7 @@ fn test_stack_metadata() {
     assert_eq!(stack.get_metadata("nonexistent"), None);
 }
 
-/// Test metadata on ExternalReference.
+/// Test metadata on `ExternalReference`.
 #[test]
 fn test_external_ref_metadata() {
     let mut ext_ref = ExternalReference::new("/path/to/media.mov");

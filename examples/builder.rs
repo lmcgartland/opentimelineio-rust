@@ -73,13 +73,13 @@ fn main() -> otio_rs::Result<()> {
                 if let otio_rs::Composable::Clip(clip) = item {
                     println!("  Clip: {}", clip.name());
                     if let Some(speaker) = clip.get_metadata("speaker") {
-                        println!("    Speaker: {}", speaker);
+                        println!("    Speaker: {speaker}");
                     }
                     if let Some(take) = clip.get_metadata("take") {
-                        println!("    Take: {}", take);
+                        println!("    Take: {take}");
                     }
                     if let Some(camera) = clip.get_metadata("camera") {
-                        println!("    Camera: {}", camera);
+                        println!("    Camera: {camera}");
                     }
                 }
             }

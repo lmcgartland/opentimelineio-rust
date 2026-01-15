@@ -1,5 +1,5 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -21,7 +21,7 @@ fn main() {
 }
 
 #[cfg(feature = "vendored")]
-fn build_vendored(out_dir: &PathBuf, manifest_dir: &PathBuf) {
+fn build_vendored(out_dir: &Path, manifest_dir: &Path) {
     // Build OTIO + shim via CMake
     let dst = cmake::Config::new(manifest_dir.join("shim"))
         .define("CMAKE_BUILD_TYPE", "Release")
@@ -43,7 +43,7 @@ fn build_vendored(out_dir: &PathBuf, manifest_dir: &PathBuf) {
 }
 
 #[cfg(feature = "system")]
-fn build_system(out_dir: &PathBuf, manifest_dir: &PathBuf) {
+fn build_system(out_dir: &Path, manifest_dir: &Path) {
     // Find system OpenTimelineIO via pkg-config
     let otio = pkg_config::Config::new()
         .atleast_version("0.15")
@@ -101,7 +101,7 @@ fn link_cpp_stdlib() {
     println!("cargo:rustc-link-lib=stdc++");
 }
 
-fn generate_bindings(out_dir: &PathBuf, manifest_dir: &PathBuf) {
+fn generate_bindings(out_dir: &Path, manifest_dir: &Path) {
     let bindings = bindgen::Builder::default()
         .header(manifest_dir.join("shim/otio_shim.h").to_string_lossy())
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

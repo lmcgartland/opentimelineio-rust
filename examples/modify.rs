@@ -43,7 +43,7 @@ fn main() -> otio_rs::Result<()> {
     for (i, child) in v1.children().enumerate() {
         match child {
             Composable::Clip(clip) => println!("  [{}] Clip: {}", i, clip.name()),
-            Composable::Gap(_) => println!("  [{}] Gap", i),
+            Composable::Gap(_) => println!("  [{i}] Gap"),
             _ => {}
         }
     }
@@ -55,7 +55,7 @@ fn main() -> otio_rs::Result<()> {
     for (i, child) in v1.children().enumerate() {
         match child {
             Composable::Clip(clip) => println!("  [{}] Clip: {}", i, clip.name()),
-            Composable::Gap(_) => println!("  [{}] Gap", i),
+            Composable::Gap(_) => println!("  [{i}] Gap"),
             _ => {}
         }
     }
@@ -71,7 +71,7 @@ fn main() -> otio_rs::Result<()> {
     for (i, child) in v1.children().enumerate() {
         match child {
             Composable::Clip(clip) => println!("  [{}] Clip: {}", i, clip.name()),
-            Composable::Gap(_) => println!("  [{}] Gap", i),
+            Composable::Gap(_) => println!("  [{i}] Gap"),
             _ => {}
         }
     }

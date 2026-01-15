@@ -40,7 +40,7 @@ pub struct ClipRef<'a> {
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> ClipRef<'a> {
+impl ClipRef<'_> {
     pub(crate) fn new(ptr: *mut ffi::OtioClip) -> Self {
         Self {
             ptr,
@@ -91,7 +91,7 @@ pub struct GapRef<'a> {
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> GapRef<'a> {
+impl GapRef<'_> {
     pub(crate) fn new(ptr: *mut ffi::OtioGap) -> Self {
         Self {
             ptr,
@@ -126,7 +126,7 @@ pub struct StackRef<'a> {
     pub(crate) _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> StackRef<'a> {
+impl StackRef<'_> {
     pub(crate) fn new(ptr: *mut ffi::OtioStack) -> Self {
         Self {
             ptr,
@@ -155,12 +155,14 @@ impl<'a> StackRef<'a> {
 
     /// Get the number of children in this stack.
     #[must_use]
+    #[allow(clippy::cast_sign_loss)]
     pub fn children_count(&self) -> usize {
         let count = unsafe { ffi::otio_stack_children_count(self.ptr) };
         count.max(0) as usize
     }
 
     /// Iterate over children of this stack.
+    #[must_use]
     pub fn children(&self) -> StackChildIter<'_> {
         StackChildIter::new(self.ptr)
     }
@@ -179,7 +181,7 @@ pub struct TrackRef<'a> {
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> TrackRef<'a> {
+impl TrackRef<'_> {
     pub(crate) fn new(ptr: *mut ffi::OtioTrack) -> Self {
         Self {
             ptr,
@@ -202,12 +204,14 @@ impl<'a> TrackRef<'a> {
 
     /// Get the number of children in this track.
     #[must_use]
+    #[allow(clippy::cast_sign_loss)]
     pub fn children_count(&self) -> usize {
         let count = unsafe { ffi::otio_track_children_count(self.ptr) };
         count.max(0) as usize
     }
 
     /// Iterate over children of this track.
+    #[must_use]
     pub fn children(&self) -> TrackChildIter<'_> {
         TrackChildIter::new(self.ptr)
     }
@@ -227,7 +231,7 @@ pub struct TrackChildIter<'a> {
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> TrackChildIter<'a> {
+impl TrackChildIter<'_> {
     pub(crate) fn new(ptr: *mut ffi::OtioTrack) -> Self {
         let count = unsafe { ffi::otio_track_children_count(ptr) };
         Self {
@@ -265,6 +269,7 @@ impl<'a> Iterator for TrackChildIter<'a> {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = (self.count - self.index).max(0) as usize;
         (0, Some(remaining))
@@ -279,7 +284,7 @@ pub struct StackChildIter<'a> {
     _marker: PhantomData<&'a ()>,
 }
 
-impl<'a> StackChildIter<'a> {
+impl StackChildIter<'_> {
     pub(crate) fn new(ptr: *mut ffi::OtioStack) -> Self {
         let count = unsafe { ffi::otio_stack_children_count(ptr) };
         Self {
@@ -317,6 +322,7 @@ impl<'a> Iterator for StackChildIter<'a> {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let remaining = (self.count - self.index).max(0) as usize;
         (0, Some(remaining))

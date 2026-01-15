@@ -37,8 +37,8 @@ fn main() -> otio_rs::Result<()> {
     // Add audio track
     let mut a1 = timeline.add_audio_track("A1");
     let audio_clip = Clip::new("Music", TimeRange::new(
-        RationalTime::new(0.0, 48000.0),
-        RationalTime::new(288000.0, 48000.0),
+        RationalTime::new(0.0, 48_000.0),
+        RationalTime::new(288_000.0, 48_000.0),
     ));
     a1.append_clip(audio_clip)?;
 

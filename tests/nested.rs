@@ -94,7 +94,7 @@ fn test_deep_stack_nesting() {
 
     // Count Stack.1 occurrences (root + outer + inner = at least 3)
     let stack_count = contents.matches("\"OTIO_SCHEMA\": \"Stack.1\"").count();
-    assert!(stack_count >= 3, "Expected at least 3 Stack.1 schemas, found {}", stack_count);
+    assert!(stack_count >= 3, "Expected at least 3 Stack.1 schemas, found {stack_count}");
 
     // Read back
     let _reloaded = Timeline::read_from_file(temp_file.path()).expect("Failed to read deeply nested structure");
@@ -156,7 +156,7 @@ fn test_stack_in_track() {
 
     // Count Stack.1 occurrences (root stack + version alternatives stack)
     let stack_count = contents.matches("\"OTIO_SCHEMA\": \"Stack.1\"").count();
-    assert!(stack_count >= 2, "Expected at least 2 Stack.1 schemas, found {}", stack_count);
+    assert!(stack_count >= 2, "Expected at least 2 Stack.1 schemas, found {stack_count}");
 
     // Read back
     let _reloaded = Timeline::read_from_file(temp_file.path()).expect("Failed to read versioning timeline");
@@ -261,7 +261,7 @@ fn test_nested_stacks() {
 
     // Count Stack.1 occurrences (root + parent + 2 children = at least 4)
     let stack_count = contents.matches("\"OTIO_SCHEMA\": \"Stack.1\"").count();
-    assert!(stack_count >= 4, "Expected at least 4 Stack.1 schemas, found {}", stack_count);
+    assert!(stack_count >= 4, "Expected at least 4 Stack.1 schemas, found {stack_count}");
 
     // Read back
     let _reloaded = Timeline::read_from_file(temp_file.path()).expect("Failed to read nested stacks");
