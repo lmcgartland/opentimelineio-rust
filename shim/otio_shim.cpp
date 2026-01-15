@@ -266,13 +266,103 @@ OtioTimeline* otio_timeline_read_from_file(const char* path, OtioError* err) {
     }
 }
 
-void otio_clip_set_metadata_string(OtioClip* clip, const char* key, const char* value) {
+} // end extern "C" for basic functions
+
+// Helper for getting metadata string - uses thread_local buffer
+static thread_local std::string g_metadata_buffer;
+
+template<typename T>
+static const char* get_metadata_string_impl(T* obj, const char* key) {
     try {
-        auto c = reinterpret_cast<otio::Clip*>(clip);
-        c->metadata()[std::string(key)] = std::string(value);
+        auto& meta = obj->metadata();
+        auto it = meta.find(std::string(key));
+        if (it != meta.end()) {
+            if (it->second.type() == typeid(std::string)) {
+                g_metadata_buffer = std::any_cast<std::string>(it->second);
+                return g_metadata_buffer.c_str();
+            }
+        }
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+template<typename T>
+static void set_metadata_string_impl(T* obj, const char* key, const char* value) {
+    try {
+        obj->metadata()[std::string(key)] = std::string(value);
     } catch (...) {
         // Ignore
     }
+}
+
+extern "C" {
+
+// Timeline metadata
+void otio_timeline_set_metadata_string(OtioTimeline* tl, const char* key, const char* value) {
+    auto timeline = reinterpret_cast<otio::Timeline*>(tl);
+    set_metadata_string_impl(timeline, key, value);
+}
+
+const char* otio_timeline_get_metadata_string(OtioTimeline* tl, const char* key) {
+    auto timeline = reinterpret_cast<otio::Timeline*>(tl);
+    return get_metadata_string_impl(timeline, key);
+}
+
+// Track metadata
+void otio_track_set_metadata_string(OtioTrack* track, const char* key, const char* value) {
+    auto t = reinterpret_cast<otio::Track*>(track);
+    set_metadata_string_impl(t, key, value);
+}
+
+const char* otio_track_get_metadata_string(OtioTrack* track, const char* key) {
+    auto t = reinterpret_cast<otio::Track*>(track);
+    return get_metadata_string_impl(t, key);
+}
+
+// Clip metadata
+void otio_clip_set_metadata_string(OtioClip* clip, const char* key, const char* value) {
+    auto c = reinterpret_cast<otio::Clip*>(clip);
+    set_metadata_string_impl(c, key, value);
+}
+
+const char* otio_clip_get_metadata_string(OtioClip* clip, const char* key) {
+    auto c = reinterpret_cast<otio::Clip*>(clip);
+    return get_metadata_string_impl(c, key);
+}
+
+// Gap metadata
+void otio_gap_set_metadata_string(OtioGap* gap, const char* key, const char* value) {
+    auto g = reinterpret_cast<otio::Gap*>(gap);
+    set_metadata_string_impl(g, key, value);
+}
+
+const char* otio_gap_get_metadata_string(OtioGap* gap, const char* key) {
+    auto g = reinterpret_cast<otio::Gap*>(gap);
+    return get_metadata_string_impl(g, key);
+}
+
+// Stack metadata
+void otio_stack_set_metadata_string(OtioStack* stack, const char* key, const char* value) {
+    auto s = reinterpret_cast<otio::Stack*>(stack);
+    set_metadata_string_impl(s, key, value);
+}
+
+const char* otio_stack_get_metadata_string(OtioStack* stack, const char* key) {
+    auto s = reinterpret_cast<otio::Stack*>(stack);
+    return get_metadata_string_impl(s, key);
+}
+
+// ExternalReference metadata
+void otio_external_ref_set_metadata_string(OtioExternalRef* ref, const char* key, const char* value) {
+    auto r = reinterpret_cast<otio::ExternalReference*>(ref);
+    set_metadata_string_impl(r, key, value);
+}
+
+const char* otio_external_ref_get_metadata_string(OtioExternalRef* ref, const char* key) {
+    auto r = reinterpret_cast<otio::ExternalReference*>(ref);
+    return get_metadata_string_impl(r, key);
 }
 
 // Stack functions

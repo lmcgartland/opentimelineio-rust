@@ -225,6 +225,27 @@ impl Timeline {
         let ptr = unsafe { ffi::otio_timeline_get_tracks(self.ptr) };
         StackRef { ptr, _marker: std::marker::PhantomData }
     }
+
+    /// Set a string metadata value on this timeline.
+    pub fn set_metadata(&mut self, key: &str, value: &str) {
+        let c_key = CString::new(key).unwrap();
+        let c_value = CString::new(value).unwrap();
+        unsafe { ffi::otio_timeline_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    }
+
+    /// Get a string metadata value from this timeline.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    #[must_use]
+    pub fn get_metadata(&self, key: &str) -> Option<String> {
+        let c_key = CString::new(key).unwrap();
+        let ptr = unsafe { ffi::otio_timeline_get_metadata_string(self.ptr, c_key.as_ptr()) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+        }
+    }
 }
 
 impl Drop for Timeline {
@@ -324,6 +345,27 @@ impl Track {
             Ok(())
         }
     }
+
+    /// Set a string metadata value on this track.
+    pub fn set_metadata(&mut self, key: &str, value: &str) {
+        let c_key = CString::new(key).unwrap();
+        let c_value = CString::new(value).unwrap();
+        unsafe { ffi::otio_track_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    }
+
+    /// Get a string metadata value from this track.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    #[must_use]
+    pub fn get_metadata(&self, key: &str) -> Option<String> {
+        let c_key = CString::new(key).unwrap();
+        let ptr = unsafe { ffi::otio_track_get_metadata_string(self.ptr, c_key.as_ptr()) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+        }
+    }
 }
 
 impl Drop for Track {
@@ -364,6 +406,20 @@ impl Clip {
         let c_value = CString::new(value).unwrap();
         unsafe { ffi::otio_clip_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
     }
+
+    /// Get a string metadata value from this clip.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    #[must_use]
+    pub fn get_metadata(&self, key: &str) -> Option<String> {
+        let c_key = CString::new(key).unwrap();
+        let ptr = unsafe { ffi::otio_clip_get_metadata_string(self.ptr, c_key.as_ptr()) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+        }
+    }
 }
 
 /// A gap represents empty space in a track.
@@ -377,6 +433,27 @@ impl Gap {
     pub fn new(duration: RationalTime) -> Self {
         let ptr = unsafe { ffi::otio_gap_create(duration.into()) };
         Self { ptr }
+    }
+
+    /// Set a string metadata value on this gap.
+    pub fn set_metadata(&mut self, key: &str, value: &str) {
+        let c_key = CString::new(key).unwrap();
+        let c_value = CString::new(value).unwrap();
+        unsafe { ffi::otio_gap_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    }
+
+    /// Get a string metadata value from this gap.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    #[must_use]
+    pub fn get_metadata(&self, key: &str) -> Option<String> {
+        let c_key = CString::new(key).unwrap();
+        let ptr = unsafe { ffi::otio_gap_get_metadata_string(self.ptr, c_key.as_ptr()) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+        }
     }
 }
 
@@ -397,6 +474,27 @@ impl ExternalReference {
     /// Set the available range for this media reference.
     pub fn set_available_range(&mut self, range: TimeRange) {
         unsafe { ffi::otio_external_ref_set_available_range(self.ptr, range.into()) }
+    }
+
+    /// Set a string metadata value on this external reference.
+    pub fn set_metadata(&mut self, key: &str, value: &str) {
+        let c_key = CString::new(key).unwrap();
+        let c_value = CString::new(value).unwrap();
+        unsafe { ffi::otio_external_ref_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    }
+
+    /// Get a string metadata value from this external reference.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    #[must_use]
+    pub fn get_metadata(&self, key: &str) -> Option<String> {
+        let c_key = CString::new(key).unwrap();
+        let ptr = unsafe { ffi::otio_external_ref_get_metadata_string(self.ptr, c_key.as_ptr()) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+        }
     }
 }
 
@@ -496,6 +594,27 @@ impl Stack {
             Err(err.into())
         } else {
             Ok(())
+        }
+    }
+
+    /// Set a string metadata value on this stack.
+    pub fn set_metadata(&mut self, key: &str, value: &str) {
+        let c_key = CString::new(key).unwrap();
+        let c_value = CString::new(value).unwrap();
+        unsafe { ffi::otio_stack_set_metadata_string(self.ptr, c_key.as_ptr(), c_value.as_ptr()) }
+    }
+
+    /// Get a string metadata value from this stack.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    #[must_use]
+    pub fn get_metadata(&self, key: &str) -> Option<String> {
+        let c_key = CString::new(key).unwrap();
+        let ptr = unsafe { ffi::otio_stack_get_metadata_string(self.ptr, c_key.as_ptr()) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
         }
     }
 }

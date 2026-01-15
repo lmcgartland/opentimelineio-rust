@@ -64,8 +64,33 @@ void otio_external_ref_free(OtioExternalRef* ref);
 int otio_timeline_write_to_file(OtioTimeline* tl, const char* path, OtioError* err);
 OtioTimeline* otio_timeline_read_from_file(const char* path, OtioError* err);
 
-// Metadata (string key-value for simplicity)
+// Metadata (string key-value pairs)
+// Returns pointer to internal string buffer - caller must copy if needed
+// Returns NULL if key not found
+
+// Timeline metadata
+void otio_timeline_set_metadata_string(OtioTimeline* tl, const char* key, const char* value);
+const char* otio_timeline_get_metadata_string(OtioTimeline* tl, const char* key);
+
+// Track metadata
+void otio_track_set_metadata_string(OtioTrack* track, const char* key, const char* value);
+const char* otio_track_get_metadata_string(OtioTrack* track, const char* key);
+
+// Clip metadata
 void otio_clip_set_metadata_string(OtioClip* clip, const char* key, const char* value);
+const char* otio_clip_get_metadata_string(OtioClip* clip, const char* key);
+
+// Gap metadata
+void otio_gap_set_metadata_string(OtioGap* gap, const char* key, const char* value);
+const char* otio_gap_get_metadata_string(OtioGap* gap, const char* key);
+
+// Stack metadata
+void otio_stack_set_metadata_string(OtioStack* stack, const char* key, const char* value);
+const char* otio_stack_get_metadata_string(OtioStack* stack, const char* key);
+
+// ExternalReference metadata
+void otio_external_ref_set_metadata_string(OtioExternalRef* ref, const char* key, const char* value);
+const char* otio_external_ref_get_metadata_string(OtioExternalRef* ref, const char* key);
 
 // Stack (composition for nested structures)
 OtioStack* otio_stack_create(const char* name);
