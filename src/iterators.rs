@@ -3,10 +3,10 @@
 //! This module provides types for iterating over children of Track and Stack,
 //! as well as parent navigation and clip search functionality.
 
-use std::ffi::CStr;
 use std::marker::PhantomData;
 
 use crate::ffi;
+use crate::ffi_string_to_rust;
 use crate::macros;
 use crate::{OtioError, RationalTime, Result, TimeRange};
 
@@ -61,13 +61,7 @@ impl ClipRef<'_> {
     #[must_use]
     pub fn name(&self) -> String {
         let ptr = unsafe { ffi::otio_clip_get_name(self.ptr) };
-        if ptr.is_null() {
-            String::new()
-        } else {
-            let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-            unsafe { ffi::otio_free_string(ptr) };
-            result
-        }
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the source range of this clip.
@@ -210,13 +204,7 @@ impl GapRef<'_> {
     #[must_use]
     pub fn name(&self) -> String {
         let ptr = unsafe { ffi::otio_gap_get_name(self.ptr) };
-        if ptr.is_null() {
-            String::new()
-        } else {
-            let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-            unsafe { ffi::otio_free_string(ptr) };
-            result
-        }
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the parent composition of this gap.
@@ -273,26 +261,14 @@ impl TransitionRef<'_> {
     #[must_use]
     pub fn name(&self) -> String {
         let ptr = unsafe { ffi::otio_transition_get_name(self.ptr) };
-        if ptr.is_null() {
-            String::new()
-        } else {
-            let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-            unsafe { ffi::otio_free_string(ptr) };
-            result
-        }
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the transition type.
     #[must_use]
     pub fn transition_type(&self) -> String {
         let ptr = unsafe { ffi::otio_transition_get_transition_type(self.ptr) };
-        if ptr.is_null() {
-            String::new()
-        } else {
-            let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-            unsafe { ffi::otio_free_string(ptr) };
-            result
-        }
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the in offset (overlap into outgoing clip).
@@ -348,13 +324,7 @@ impl StackRef<'_> {
     #[must_use]
     pub fn name(&self) -> String {
         let ptr = unsafe { ffi::otio_stack_get_name(self.ptr) };
-        if ptr.is_null() {
-            String::new()
-        } else {
-            let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-            unsafe { ffi::otio_free_string(ptr) };
-            result
-        }
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the number of children in this stack.
@@ -397,13 +367,7 @@ impl TrackRef<'_> {
     #[must_use]
     pub fn name(&self) -> String {
         let ptr = unsafe { ffi::otio_track_get_name(self.ptr) };
-        if ptr.is_null() {
-            String::new()
-        } else {
-            let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-            unsafe { ffi::otio_free_string(ptr) };
-            result
-        }
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the number of children in this track.

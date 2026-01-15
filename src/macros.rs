@@ -244,16 +244,7 @@ macro_rules! impl_string_getter {
         #[must_use]
         pub fn $method(&self) -> String {
             let ptr = unsafe { crate::ffi::$ffi_fn(self.ptr) };
-            if ptr.is_null() {
-                return String::new();
-            }
-            let result = unsafe {
-                std::ffi::CStr::from_ptr(ptr)
-                    .to_string_lossy()
-                    .into_owned()
-            };
-            unsafe { crate::ffi::otio_free_string(ptr) };
-            result
+            crate::ffi_string_to_rust(ptr)
         }
     };
 }

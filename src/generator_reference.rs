@@ -1,6 +1,6 @@
 //! `GeneratorReference` type for generated media content.
 
-use crate::{ffi, macros, traits, TimeRange};
+use crate::{ffi, is_unset_time_range, macros, traits, TimeRange};
 use std::ffi::CString;
 
 /// Common generator kinds.
@@ -84,11 +84,9 @@ impl GeneratorReference {
 
     /// Get the available range of this generator.
     #[must_use]
-    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn available_range(&self) -> Option<TimeRange> {
         let ffi_range = unsafe { ffi::otio_generator_ref_get_available_range(self.ptr) };
-        // Check if this is a zero range (meaning no range set)
-        if ffi_range.duration.value == 0.0 && ffi_range.duration.rate == 1.0 {
+        if is_unset_time_range(&ffi_range) {
             return None;
         }
         Some(TimeRange::new(

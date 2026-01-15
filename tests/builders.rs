@@ -12,7 +12,7 @@ fn make_time_range(start: f64, duration: f64, rate: f64) -> TimeRange {
 #[test]
 fn test_clip_builder_basic() {
     let source_range = make_time_range(0.0, 48.0, 24.0);
-    let _clip = Clip::builder("test_clip", source_range).build();
+    let _clip = Clip::builder("test_clip", source_range).build().unwrap();
     // Clip was created successfully
 }
 
@@ -22,7 +22,7 @@ fn test_clip_builder_with_metadata() {
     let clip = Clip::builder("clip", source_range)
         .metadata("author", "John")
         .metadata("description", "A test clip")
-        .build();
+        .build().unwrap();
 
     assert_eq!(clip.get_metadata("author"), Some("John".to_string()));
     assert_eq!(
@@ -38,7 +38,7 @@ fn test_clip_builder_with_media_reference() {
 
     let _clip = Clip::builder("clip", source_range)
         .media_reference(media_ref)
-        .build();
+        .build().unwrap();
     // Clip with media reference was created successfully
 }
 
@@ -52,7 +52,7 @@ fn test_clip_builder_full_chain() {
         .metadata("project", "Test Project")
         .metadata("scene", "1")
         .metadata("take", "3")
-        .build();
+        .build().unwrap();
 
     assert_eq!(clip.get_metadata("project"), Some("Test Project".to_string()));
     assert_eq!(clip.get_metadata("scene"), Some("1".to_string()));
@@ -63,7 +63,7 @@ fn test_clip_builder_full_chain() {
 
 #[test]
 fn test_timeline_builder_basic() {
-    let _tl = Timeline::builder("my_timeline").build();
+    let _tl = Timeline::builder("my_timeline").build().unwrap();
     // Timeline was created successfully
 }
 
@@ -72,7 +72,7 @@ fn test_timeline_builder_with_global_start_time() {
     let start_time = RationalTime::new(3600.0, 24.0);
     let _tl = Timeline::builder("timeline")
         .global_start_time(start_time)
-        .build();
+        .build().unwrap();
     // Global start time is set (we can verify through serialization later)
 }
 
@@ -82,7 +82,7 @@ fn test_timeline_builder_with_metadata() {
         .metadata("project_name", "Big Movie")
         .metadata("editor", "Jane Doe")
         .metadata("version", "2")
-        .build();
+        .build().unwrap();
 
     assert_eq!(tl.get_metadata("project_name"), Some("Big Movie".to_string()));
     assert_eq!(tl.get_metadata("editor"), Some("Jane Doe".to_string()));
@@ -97,7 +97,7 @@ fn test_timeline_builder_full_chain() {
         .global_start_time(start_time)
         .metadata("format", "OTIO")
         .metadata("source", "Test Suite")
-        .build();
+        .build().unwrap();
 
     assert_eq!(tl.get_metadata("format"), Some("OTIO".to_string()));
     assert_eq!(tl.get_metadata("source"), Some("Test Suite".to_string()));
@@ -107,7 +107,7 @@ fn test_timeline_builder_full_chain() {
 
 #[test]
 fn test_external_ref_builder_basic() {
-    let _ext_ref = ExternalReference::builder("/path/to/file.mov").build();
+    let _ext_ref = ExternalReference::builder("/path/to/file.mov").build().unwrap();
     // Basic external reference created successfully
 }
 
@@ -116,7 +116,7 @@ fn test_external_ref_builder_with_available_range() {
     let available_range = make_time_range(0.0, 1000.0, 24.0);
     let _ext_ref = ExternalReference::builder("https://cdn.example.com/video.mp4")
         .available_range(available_range)
-        .build();
+        .build().unwrap();
     // External reference with available range set
 }
 
@@ -125,7 +125,7 @@ fn test_external_ref_builder_with_metadata() {
     let ext_ref = ExternalReference::builder("/media/clip.mov")
         .metadata("codec", "ProRes422")
         .metadata("resolution", "1920x1080")
-        .build();
+        .build().unwrap();
 
     assert_eq!(ext_ref.get_metadata("codec"), Some("ProRes422".to_string()));
     assert_eq!(
@@ -143,7 +143,7 @@ fn test_external_ref_builder_full_chain() {
         .metadata("format", "MXF")
         .metadata("storage", "S3")
         .metadata("region", "us-west-2")
-        .build();
+        .build().unwrap();
 
     assert_eq!(ext_ref.get_metadata("format"), Some("MXF".to_string()));
     assert_eq!(ext_ref.get_metadata("storage"), Some("S3".to_string()));
@@ -158,7 +158,7 @@ fn test_builders_in_timeline_construction() {
     let mut tl = Timeline::builder("production_timeline")
         .global_start_time(RationalTime::new(0.0, 24.0))
         .metadata("project", "Documentary")
-        .build();
+        .build().unwrap();
 
     let mut track = tl.add_video_track("V1");
 
@@ -166,23 +166,23 @@ fn test_builders_in_timeline_construction() {
     let media1 = ExternalReference::builder("/footage/shot001.mov")
         .available_range(make_time_range(0.0, 240.0, 24.0))
         .metadata("camera", "A")
-        .build();
+        .build().unwrap();
 
     let clip1 = Clip::builder("Interview A", make_time_range(100.0, 48.0, 24.0))
         .media_reference(media1)
         .metadata("scene", "1")
-        .build();
+        .build().unwrap();
 
     let media2 = ExternalReference::builder("/footage/shot002.mov")
         .available_range(make_time_range(0.0, 360.0, 24.0))
         .metadata("camera", "B")
-        .build();
+        .build().unwrap();
 
     let clip2 = Clip::builder("B-Roll", make_time_range(50.0, 72.0, 24.0))
         .media_reference(media2)
         .metadata("scene", "1")
         .metadata("type", "b-roll")
-        .build();
+        .build().unwrap();
 
     track.append_clip(clip1).unwrap();
     track.append_clip(clip2).unwrap();
@@ -197,13 +197,13 @@ fn test_builder_method_chaining_order_independence() {
         .metadata("a", "1")
         .metadata("b", "2")
         .metadata("c", "3")
-        .build();
+        .build().unwrap();
 
     let clip2 = Clip::builder("clip", make_time_range(0.0, 24.0, 24.0))
         .metadata("c", "3")
         .metadata("a", "1")
         .metadata("b", "2")
-        .build();
+        .build().unwrap();
 
     // Both should have the same metadata regardless of order
     assert_eq!(clip1.get_metadata("a"), clip2.get_metadata("a"));

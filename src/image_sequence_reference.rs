@@ -1,7 +1,7 @@
 //! `ImageSequenceReference` type for VFX image sequence media.
 
-use crate::{ffi, macros, traits, RationalTime, Result, TimeRange};
-use std::ffi::{CStr, CString};
+use crate::{ffi, ffi_string_to_rust, is_unset_time_range, macros, traits, RationalTime, Result, TimeRange};
+use std::ffi::CString;
 
 /// Policy for handling missing frames in an image sequence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -229,18 +229,14 @@ impl ImageSequenceReference {
         if ptr.is_null() {
             return Err(err.into());
         }
-        let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-        unsafe { ffi::otio_free_string(ptr) };
-        Ok(result)
+        Ok(ffi_string_to_rust(ptr))
     }
 
     /// Get the available range of this image sequence.
     #[must_use]
-    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn available_range(&self) -> Option<TimeRange> {
         let ffi_range = unsafe { ffi::otio_image_seq_ref_get_available_range(self.ptr) };
-        // Check if this is a zero range (meaning no range set)
-        if ffi_range.duration.value == 0.0 && ffi_range.duration.rate == 1.0 {
+        if is_unset_time_range(&ffi_range) {
             return None;
         }
         Some(TimeRange::new(

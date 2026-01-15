@@ -103,6 +103,48 @@ impl From<ffi::OtioError> for OtioError {
     }
 }
 
+// ============================================================================
+// FFI Helper Functions
+// ============================================================================
+
+/// Convert an FFI string pointer to a Rust String, freeing the pointer.
+///
+/// Returns an empty string if the pointer is null.
+///
+/// # Safety
+///
+/// The pointer must be either null or a valid C string allocated by the FFI layer.
+pub(crate) fn ffi_string_to_rust(ptr: *mut std::ffi::c_char) -> String {
+    if ptr.is_null() {
+        return String::new();
+    }
+    // SAFETY: We checked for null above, and the FFI contract guarantees
+    // the pointer is a valid null-terminated C string.
+    let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
+    unsafe { ffi::otio_free_string(ptr) };
+    result
+}
+
+/// Check if an FFI `RationalTime` represents an unset/sentinel value.
+///
+/// The FFI layer uses rate=1.0, value=0.0 as a sentinel for "not set".
+#[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
+pub(crate) fn is_unset_rational_time(rt: &ffi::OtioRationalTime) -> bool {
+    rt.rate == 1.0 && rt.value == 0.0
+}
+
+/// Check if an FFI `TimeRange` represents an unset/sentinel value.
+///
+/// The FFI layer uses duration.rate=1.0, duration.value=0.0 as a sentinel for "not set".
+#[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
+pub(crate) fn is_unset_time_range(tr: &ffi::OtioTimeRange) -> bool {
+    tr.duration.rate == 1.0 && tr.duration.value == 0.0
+}
+
+// ============================================================================
+// Core Types
+// ============================================================================
+
 /// A rational time value with a rate.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RationalTime {
@@ -322,23 +364,16 @@ impl Timeline {
     #[must_use]
     pub fn name(&self) -> String {
         let ptr = unsafe { ffi::otio_timeline_get_name(self.ptr) };
-        if ptr.is_null() {
-            return String::new();
-        }
-        let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-        unsafe { ffi::otio_free_string(ptr) };
-        result
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the global start time of this timeline.
     ///
     /// Returns `None` if no global start time has been set.
     #[must_use]
-    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn global_start_time(&self) -> Option<RationalTime> {
         let rt = unsafe { ffi::otio_timeline_get_global_start_time(self.ptr) };
-        // A zero rate indicates no value was set
-        if rt.rate == 1.0 && rt.value == 0.0 {
+        if is_unset_rational_time(&rt) {
             return None;
         }
         Some(RationalTime::new(rt.value, rt.rate))
@@ -998,23 +1033,16 @@ impl ExternalReference {
     #[must_use]
     pub fn target_url(&self) -> String {
         let ptr = unsafe { ffi::otio_external_ref_get_target_url(self.ptr) };
-        if ptr.is_null() {
-            return String::new();
-        }
-        let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
-        unsafe { ffi::otio_free_string(ptr) };
-        result
+        ffi_string_to_rust(ptr)
     }
 
     /// Get the available range of this media reference.
     ///
     /// Returns `None` if no available range has been set.
     #[must_use]
-    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn available_range(&self) -> Option<TimeRange> {
         let range = unsafe { ffi::otio_external_ref_get_available_range(self.ptr) };
-        // Check for zero range (no range set)
-        if range.duration.value == 0.0 && range.duration.rate == 1.0 {
+        if is_unset_time_range(&range) {
             return None;
         }
         Some(TimeRange::new(

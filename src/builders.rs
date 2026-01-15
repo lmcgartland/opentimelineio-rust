@@ -2,8 +2,12 @@
 //!
 //! Builders provide a fluent API for constructing complex OTIO objects
 //! with optional fields.
+//!
+//! Each builder provides two build methods:
+//! - `build()` - Returns `Result<T>`, propagating any errors
+//! - `build_unchecked()` - Returns `T`, ignoring any errors (for convenience)
 
-use crate::{Clip, ExternalReference, HasMetadata, RationalTime, TimeRange, Timeline};
+use crate::{Clip, ExternalReference, HasMetadata, RationalTime, Result, TimeRange, Timeline};
 
 /// Builder for creating `Clip` instances.
 ///
@@ -19,7 +23,8 @@ use crate::{Clip, ExternalReference, HasMetadata, RationalTime, TimeRange, Timel
 ///     .media_reference(ExternalReference::new("/path/to/media.mov"))
 ///     .metadata("author", "Jane Doe")
 ///     .metadata("project", "Demo")
-///     .build();
+///     .build()
+///     .unwrap();
 /// ```
 pub struct ClipBuilder {
     name: String,
@@ -54,12 +59,30 @@ impl ClipBuilder {
         self
     }
 
-    /// Build the clip.
+    /// Build the clip, returning an error if any operation fails.
     ///
-    /// Note: If a media reference was set, this will call `set_media_reference`
-    /// which can fail. Any errors are silently ignored in the builder pattern.
+    /// # Errors
+    ///
+    /// Returns an error if setting the media reference fails.
+    pub fn build(self) -> Result<Clip> {
+        let mut clip = Clip::new(&self.name, self.source_range);
+
+        if let Some(reference) = self.media_reference {
+            clip.set_media_reference(reference)?;
+        }
+
+        for (key, value) in self.metadata {
+            clip.set_metadata(&key, &value);
+        }
+
+        Ok(clip)
+    }
+
+    /// Build the clip, ignoring any errors.
+    ///
+    /// Use this when you don't care about errors during construction.
     #[must_use]
-    pub fn build(self) -> Clip {
+    pub fn build_unchecked(self) -> Clip {
         let mut clip = Clip::new(&self.name, self.source_range);
 
         if let Some(reference) = self.media_reference {
@@ -84,7 +107,8 @@ impl ClipBuilder {
 /// let timeline = TimelineBuilder::new("My Project")
 ///     .global_start_time(RationalTime::new(0.0, 24.0))
 ///     .metadata("author", "John Smith")
-///     .build();
+///     .build()
+///     .unwrap();
 /// ```
 pub struct TimelineBuilder {
     name: String,
@@ -117,9 +141,30 @@ impl TimelineBuilder {
         self
     }
 
-    /// Build the timeline.
+    /// Build the timeline, returning an error if any operation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if setting the global start time fails.
+    pub fn build(self) -> Result<Timeline> {
+        let mut timeline = Timeline::new(&self.name);
+
+        if let Some(time) = self.global_start_time {
+            timeline.set_global_start_time(time)?;
+        }
+
+        for (key, value) in self.metadata {
+            timeline.set_metadata(&key, &value);
+        }
+
+        Ok(timeline)
+    }
+
+    /// Build the timeline, ignoring any errors.
+    ///
+    /// Use this when you don't care about errors during construction.
     #[must_use]
-    pub fn build(self) -> Timeline {
+    pub fn build_unchecked(self) -> Timeline {
         let mut timeline = Timeline::new(&self.name);
 
         if let Some(time) = self.global_start_time {
@@ -147,7 +192,8 @@ impl TimelineBuilder {
 ///         RationalTime::new(720.0, 24.0),
 ///     ))
 ///     .metadata("codec", "ProRes")
-///     .build();
+///     .build()
+///     .unwrap();
 /// ```
 pub struct ExternalReferenceBuilder {
     target_url: String,
@@ -180,9 +226,30 @@ impl ExternalReferenceBuilder {
         self
     }
 
-    /// Build the external reference.
+    /// Build the external reference, returning an error if any operation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if setting the available range fails.
+    pub fn build(self) -> Result<ExternalReference> {
+        let mut reference = ExternalReference::new(&self.target_url);
+
+        if let Some(range) = self.available_range {
+            reference.set_available_range(range)?;
+        }
+
+        for (key, value) in self.metadata {
+            reference.set_metadata(&key, &value);
+        }
+
+        Ok(reference)
+    }
+
+    /// Build the external reference, ignoring any errors.
+    ///
+    /// Use this when you don't care about errors during construction.
     #[must_use]
-    pub fn build(self) -> ExternalReference {
+    pub fn build_unchecked(self) -> ExternalReference {
         let mut reference = ExternalReference::new(&self.target_url);
 
         if let Some(range) = self.available_range {

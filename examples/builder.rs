@@ -12,7 +12,7 @@ fn main() -> otio_rs::Result<()> {
         .global_start_time(RationalTime::new(0.0, 24.0))
         .metadata("author", "Jane Doe")
         .metadata("project", "Demo Project")
-        .build();
+        .build()?;
 
     // Add a video track
     let mut v1 = timeline.add_video_track("V1");
@@ -30,11 +30,11 @@ fn main() -> otio_rs::Result<()> {
             ))
             .metadata("codec", "ProRes")
             .metadata("resolution", "1920x1080")
-            .build(),
+            .build()?,
     )
     .metadata("speaker", "John Smith")
     .metadata("take", "3")
-    .build();
+    .build()?;
 
     v1.append_clip(clip1)?;
 
@@ -49,10 +49,10 @@ fn main() -> otio_rs::Result<()> {
                 RationalTime::new(0.0, 24.0),
                 RationalTime::new(480.0, 24.0),
             ))
-            .build(),
+            .build()?,
     )
     .metadata("camera", "GoPro Hero 12")
-    .build();
+    .build()?;
 
     v1.append_clip(clip2)?;
 
