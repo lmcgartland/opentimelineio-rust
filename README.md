@@ -2,7 +2,7 @@
 
 Rust bindings to [OpenTimelineIO](https://opentimeline.io/) - an open-source API and interchange format for editorial timeline information.
 
-[![Test](https://github.com/lukemcgartland/opentimelineio-rust/actions/workflows/test.yml/badge.svg)](https://github.com/lukemcgartland/opentimelineio-rust/actions/workflows/test.yml)
+[![Test](https://github.com/lmcgartland/opentimelineio-rust/actions/workflows/test.yml/badge.svg)](https://github.com/lmcgartland/opentimelineio-rust/actions/workflows/test.yml)
 
 ## Status
 
@@ -57,7 +57,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-otio-rs = { git = "https://github.com/lukemcgartland/opentimelineio-rust" }
+otio-rs = { git = "https://github.com/lmcgartland/opentimelineio-rust" }
 ```
 
 ### Feature Flags
@@ -70,7 +70,7 @@ otio-rs = { git = "https://github.com/lukemcgartland/opentimelineio-rust" }
 To use system-installed OpenTimelineIO instead of vendored:
 ```toml
 [dependencies]
-otio-rs = { git = "https://github.com/lukemcgartland/opentimelineio-rust", default-features = false, features = ["system"] }
+otio-rs = { git = "https://github.com/lmcgartland/opentimelineio-rust", default-features = false, features = ["system"] }
 ```
 
 ## Quick Start
@@ -333,7 +333,7 @@ use otio_rs::{ClipBuilder, TimelineBuilder, ExternalReferenceBuilder, RationalTi
 let timeline = TimelineBuilder::new("My Project")
     .global_start_time(RationalTime::new(0.0, 24.0))
     .metadata("author", "Jane Doe")
-    .build();
+    .build()?;
 
 let clip = ClipBuilder::new(
     "Interview",
@@ -346,10 +346,10 @@ let clip = ClipBuilder::new(
             RationalTime::new(720.0, 24.0),
         ))
         .metadata("codec", "ProRes")
-        .build(),
+        .build()?,
 )
 .metadata("speaker", "John Smith")
-.build();
+.build()?;
 ```
 
 ## Iteration
@@ -426,7 +426,7 @@ track.clear_children()?;
 
 ```bash
 # Clone with submodules (required!)
-git clone --recursive https://github.com/lukemcgartland/opentimelineio-rust
+git clone --recursive https://github.com/lmcgartland/opentimelineio-rust
 cd opentimelineio-rust
 ```
 
@@ -572,6 +572,7 @@ otio-rs/
 └── tests/
     ├── extended_features.rs  # Comprehensive feature tests
     ├── memory.rs             # Memory leak stress tests
+    ├── error_handling.rs     # FFI error propagation tests
     ├── roundtrip.rs          # File I/O tests
     ├── metadata.rs           # Metadata tests
     ├── nested.rs             # Nested structure tests
