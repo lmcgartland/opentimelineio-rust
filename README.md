@@ -650,7 +650,7 @@ otio-rs/
 │   └── builder.rs      # Builder pattern
 └── tests/
     ├── extended_features.rs  # Comprehensive feature tests
-    ├── new_features.rs       # Track filtering, neighbors, available_range tests
+    ├── timeline_iteration.rs # Track filtering, neighbors, available_range tests
     ├── memory.rs             # Memory leak stress tests
     ├── error_handling.rs     # FFI error propagation tests
     ├── roundtrip.rs          # File I/O tests

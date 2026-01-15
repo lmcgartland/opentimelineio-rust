@@ -1,4 +1,4 @@
-//! Tests for newly implemented OTIO features.
+//! Tests for timeline iteration and track query features.
 //!
 //! This file tests:
 //! - `Clip::available_range()`
@@ -433,7 +433,7 @@ fn test_clip_media_reference_keys_with_default() {
 // ============================================================================
 
 #[test]
-fn test_full_workflow_with_new_features() {
+fn test_full_timeline_workflow() {
     // Create a timeline with multiple tracks
     let mut timeline = Timeline::new("Production Timeline");
 
