@@ -1,10 +1,15 @@
 //! Memory leak stress tests.
 //!
 //! These tests are designed to be run with memory analysis tools like Valgrind
-//! or AddressSanitizer to detect memory leaks in the FFI bindings.
+//! or `AddressSanitizer` to detect memory leaks in the FFI bindings.
 //!
 //! Run with: `cargo test --test memory -- --ignored --test-threads=1`
 //! Run with Valgrind: `./scripts/check_memory.sh`
+
+// Allow exact float comparisons in tests - values are known exactly
+#![allow(clippy::float_cmp)]
+// Intentional drops to test memory cleanup
+#![allow(clippy::drop_non_drop)]
 
 use otio_rs::{
     marker, Clip, Gap, HasMetadata, ImageSequenceReference, Marker, RationalTime, Stack,
@@ -13,10 +18,10 @@ use otio_rs::{
 
 /// Stress test: Create and drop many timelines.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_timeline_creation() {
     for i in 0..10_000 {
-        let timeline = Timeline::new(&format!("Timeline {}", i));
+        let timeline = Timeline::new(&format!("Timeline {i}"));
         assert!(!timeline.name().is_empty());
         drop(timeline);
     }
@@ -24,10 +29,10 @@ fn stress_test_timeline_creation() {
 
 /// Stress test: Create complex timelines with many tracks and clips.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_complex_timeline() {
     for iteration in 0..100 {
-        let mut timeline = Timeline::new(&format!("Complex {}", iteration));
+        let mut timeline = Timeline::new(&format!("Complex {iteration}"));
 
         // Add multiple video tracks
         for t in 0..5 {
@@ -36,7 +41,7 @@ fn stress_test_complex_timeline() {
             // Add clips to each track
             for c in 0..20 {
                 let clip = Clip::new(
-                    &format!("Clip_{}_{}", t, c),
+                    &format!("Clip_{t}_{c}"),
                     TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
                 );
                 track.append_clip(clip).unwrap();
@@ -53,20 +58,20 @@ fn stress_test_complex_timeline() {
 
 /// Stress test: Create and drop clips with markers.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_clips_with_markers() {
     for iteration in 0..1_000 {
         let mut clip = Clip::new(
-            &format!("Clip {}", iteration),
+            &format!("Clip {iteration}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0)),
         );
 
         // Add multiple markers
         for m in 0..10 {
             let marker = Marker::new(
-                &format!("Marker {}", m),
+                &format!("Marker {m}"),
                 TimeRange::new(
-                    RationalTime::new(m as f64, 24.0),
+                    RationalTime::new(f64::from(m), 24.0),
                     RationalTime::new(1.0, 24.0),
                 ),
                 marker::colors::RED,
@@ -80,7 +85,7 @@ fn stress_test_clips_with_markers() {
 
 /// Stress test: Create and drop gaps.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_gaps() {
     for _ in 0..10_000 {
         let gap = Gap::new(RationalTime::new(24.0, 24.0));
@@ -91,15 +96,15 @@ fn stress_test_gaps() {
 
 /// Stress test: Create and drop tracks with mixed content.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_tracks_with_gaps() {
     for iteration in 0..500 {
-        let mut track = Track::new_video(&format!("Track {}", iteration));
+        let mut track = Track::new_video(&format!("Track {iteration}"));
 
         for i in 0..50 {
             if i % 2 == 0 {
                 let clip = Clip::new(
-                    &format!("Clip {}", i),
+                    &format!("Clip {i}"),
                     TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
                 );
                 track.append_clip(clip).unwrap();
@@ -115,16 +120,16 @@ fn stress_test_tracks_with_gaps() {
 
 /// Stress test: Serialization roundtrip.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_serialization_roundtrip() {
     for iteration in 0..500 {
         // Create timeline
-        let mut timeline = Timeline::new(&format!("Roundtrip {}", iteration));
+        let mut timeline = Timeline::new(&format!("Roundtrip {iteration}"));
         let mut track = timeline.add_video_track("V1");
 
         for i in 0..10 {
             let clip = Clip::new(
-                &format!("Clip {}", i),
+                &format!("Clip {i}"),
                 TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0)),
             );
             track.append_clip(clip).unwrap();
@@ -142,9 +147,9 @@ fn stress_test_serialization_roundtrip() {
     }
 }
 
-/// Stress test: find_clips iterator.
+/// Stress test: `find_clips` iterator.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_find_clips_iterator() {
     // Create a large timeline
     let mut timeline = Timeline::new("Large");
@@ -152,7 +157,7 @@ fn stress_test_find_clips_iterator() {
 
     for i in 0..1000 {
         let clip = Clip::new(
-            &format!("Clip {}", i),
+            &format!("Clip {i}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
         );
         track.append_clip(clip).unwrap();
@@ -174,17 +179,17 @@ fn stress_test_find_clips_iterator() {
 
 /// Stress test: Stack operations.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_stacks() {
     for iteration in 0..500 {
-        let mut stack = Stack::new(&format!("Stack {}", iteration));
+        let mut stack = Stack::new(&format!("Stack {iteration}"));
 
         for t in 0..5 {
-            let mut track = Track::new_video(&format!("Track {}", t));
+            let mut track = Track::new_video(&format!("Track {t}"));
 
             for c in 0..10 {
                 let clip = Clip::new(
-                    &format!("Clip_{}_{}", t, c),
+                    &format!("Clip_{t}_{c}"),
                     TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
                 );
                 track.append_clip(clip).unwrap();
@@ -197,13 +202,13 @@ fn stress_test_stacks() {
     }
 }
 
-/// Stress test: ImageSequenceReference creation.
+/// Stress test: `ImageSequenceReference` creation.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_image_sequence_reference() {
     for iteration in 0..5_000 {
         let mut seq = ImageSequenceReference::new(
-            &format!("/path/to/sequence_{}/", iteration),
+            &format!("/path/to/sequence_{iteration}/"),
             "frame_",
             ".exr",
             1001,
@@ -232,16 +237,16 @@ fn stress_test_image_sequence_reference() {
 
 /// Stress test: Markers on tracks.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_track_markers() {
     for iteration in 0..500 {
-        let mut track = Track::new_video(&format!("Track {}", iteration));
+        let mut track = Track::new_video(&format!("Track {iteration}"));
 
         for m in 0..50 {
             let marker = Marker::new(
-                &format!("Marker {}", m),
+                &format!("Marker {m}"),
                 TimeRange::new(
-                    RationalTime::new(m as f64 * 24.0, 24.0),
+                    RationalTime::new(f64::from(m) * 24.0, 24.0),
                     RationalTime::new(1.0, 24.0),
                 ),
                 marker::colors::GREEN,
@@ -255,10 +260,10 @@ fn stress_test_track_markers() {
 
 /// Stress test: String operations (name getting).
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_string_operations() {
     for i in 0..10_000 {
-        let name = format!("Timeline with a longer name {}", i);
+        let name = format!("Timeline with a longer name {i}");
         let timeline = Timeline::new(&name);
         let retrieved = timeline.name();
         assert_eq!(retrieved, name);
@@ -267,31 +272,31 @@ fn stress_test_string_operations() {
 
 /// Stress test: Metadata operations.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_metadata() {
     for iteration in 0..1_000 {
         let mut clip = Clip::new(
-            &format!("Clip {}", iteration),
+            &format!("Clip {iteration}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0)),
         );
 
         // Set many metadata keys
         for k in 0..20 {
-            clip.set_metadata(&format!("key_{}", k), &format!("value_{}", k));
+            clip.set_metadata(&format!("key_{k}"), &format!("value_{k}"));
         }
 
         // Read them back
         for k in 0..20 {
-            let value = clip.get_metadata(&format!("key_{}", k));
+            let value = clip.get_metadata(&format!("key_{k}"));
             assert!(value.is_some());
-            assert_eq!(value.unwrap(), format!("value_{}", k));
+            assert_eq!(value.unwrap(), format!("value_{k}"));
         }
     }
 }
 
-/// Stress test: RationalTime creation.
+/// Stress test: `RationalTime` creation.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_rational_time() {
     for _ in 0..100_000 {
         let t1 = RationalTime::new(1.0, 24.0);
@@ -307,9 +312,9 @@ fn stress_test_rational_time() {
     }
 }
 
-/// Stress test: TimeRange operations.
+/// Stress test: `TimeRange` operations.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_time_range() {
     for _ in 0..100_000 {
         let r1 = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0));
@@ -326,7 +331,7 @@ fn stress_test_time_range() {
 
 /// Stress test: Rapid timeline destruction during iteration.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_early_drop() {
     for _ in 0..1_000 {
         let mut timeline = Timeline::new("DropTest");
@@ -334,7 +339,7 @@ fn stress_test_early_drop() {
 
         for i in 0..100 {
             let clip = Clip::new(
-                &format!("Clip {}", i),
+                &format!("Clip {i}"),
                 TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
             );
             track.append_clip(clip).unwrap();
@@ -351,17 +356,17 @@ fn stress_test_early_drop() {
 
 /// Stress test: Audio tracks.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_audio_tracks() {
     for iteration in 0..500 {
-        let mut timeline = Timeline::new(&format!("Audio Timeline {}", iteration));
+        let mut timeline = Timeline::new(&format!("Audio Timeline {iteration}"));
 
         for t in 0..3 {
             let mut track = timeline.add_audio_track(&format!("A{}", t + 1));
 
             for c in 0..30 {
                 let clip = Clip::new(
-                    &format!("Audio_{}_{}", t, c),
+                    &format!("Audio_{t}_{c}"),
                     TimeRange::new(RationalTime::new(0.0, 48000.0), RationalTime::new(48000.0, 48000.0)),
                 );
                 track.append_clip(clip).unwrap();
@@ -375,17 +380,17 @@ fn stress_test_audio_tracks() {
 
 /// Stress test: Mixed video and audio tracks.
 #[test]
-#[ignore]
+#[ignore = "Run with memory tools: cargo test --test memory -- --ignored"]
 fn stress_test_mixed_tracks() {
     for iteration in 0..200 {
-        let mut timeline = Timeline::new(&format!("Mixed {}", iteration));
+        let mut timeline = Timeline::new(&format!("Mixed {iteration}"));
 
         // Add video tracks
         for v in 0..2 {
             let mut track = timeline.add_video_track(&format!("V{}", v + 1));
             for c in 0..25 {
                 let clip = Clip::new(
-                    &format!("Video_{}_{}", v, c),
+                    &format!("Video_{v}_{c}"),
                     TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
                 );
                 track.append_clip(clip).unwrap();
@@ -397,7 +402,7 @@ fn stress_test_mixed_tracks() {
             let mut track = timeline.add_audio_track(&format!("A{}", a + 1));
             for c in 0..25 {
                 let clip = Clip::new(
-                    &format!("Audio_{}_{}", a, c),
+                    &format!("Audio_{a}_{c}"),
                     TimeRange::new(RationalTime::new(0.0, 48000.0), RationalTime::new(48000.0, 48000.0)),
                 );
                 track.append_clip(clip).unwrap();

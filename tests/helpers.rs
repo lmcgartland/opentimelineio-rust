@@ -32,12 +32,16 @@ pub fn quick_clip(name: &str) -> Clip {
 }
 
 /// Create a timeline with a video track containing the specified number of clips.
+///
+/// # Panics
+///
+/// Panics if clips cannot be appended to the track.
 #[must_use]
 pub fn timeline_with_clips(name: &str, track_name: &str, clip_count: usize) -> Timeline {
     let mut timeline = Timeline::new(name);
     let mut track = timeline.add_video_track(track_name);
     for i in 0..clip_count {
-        let clip = Clip::new(&format!("Clip {}", i), default_range());
+        let clip = Clip::new(&format!("Clip {i}"), default_range());
         track.append_clip(clip).unwrap();
     }
     drop(track);
@@ -45,11 +49,15 @@ pub fn timeline_with_clips(name: &str, track_name: &str, clip_count: usize) -> T
 }
 
 /// Create a standalone video track with the specified number of clips.
+///
+/// # Panics
+///
+/// Panics if clips cannot be appended to the track.
 #[must_use]
 pub fn track_with_clips(name: &str, clip_count: usize) -> Track {
     let mut track = Track::new_video(name);
     for i in 0..clip_count {
-        let clip = Clip::new(&format!("Clip {}", i), default_range());
+        let clip = Clip::new(&format!("Clip {i}"), default_range());
         track.append_clip(clip).unwrap();
     }
     track

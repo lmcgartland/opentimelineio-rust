@@ -84,6 +84,7 @@ impl GeneratorReference {
 
     /// Get the available range of this generator.
     #[must_use]
+    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn available_range(&self) -> Option<TimeRange> {
         let ffi_range = unsafe { ffi::otio_generator_ref_get_available_range(self.ptr) };
         // Check if this is a zero range (meaning no range set)

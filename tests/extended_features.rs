@@ -1,5 +1,10 @@
 //! Tests for extended OTIO features added in this phase.
 
+// Allow exact float comparisons in tests - values are known exactly
+#![allow(clippy::float_cmp)]
+// Allow similar names in tests for clarity
+#![allow(clippy::similar_names)]
+
 use otio_rs::{
     generator_reference::kinds as gen_kinds,
     image_sequence_reference::MissingFramePolicy,
@@ -156,8 +161,8 @@ fn test_clip_add_multiple_markers() {
 
     for i in 0..5 {
         let marker_range =
-            TimeRange::new(RationalTime::new(i as f64 * 10.0, 24.0), RationalTime::new(5.0, 24.0));
-        let marker = Marker::new(&format!("Marker {}", i), marker_range, colors::GREEN);
+            TimeRange::new(RationalTime::new(f64::from(i) * 10.0, 24.0), RationalTime::new(5.0, 24.0));
+        let marker = Marker::new(&format!("Marker {i}"), marker_range, colors::GREEN);
         clip.add_marker(marker).unwrap();
     }
 
@@ -583,7 +588,7 @@ fn test_track_find_clips_count() {
 
     for i in 0..5 {
         let clip = Clip::new(
-            &format!("Clip {}", i),
+            &format!("Clip {i}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
         );
         track.append_clip(clip).unwrap();
@@ -624,7 +629,7 @@ fn test_stack_find_clips_recursive() {
     let clips: Vec<_> = stack.find_clips().collect();
     assert_eq!(clips.len(), 3);
 
-    let names: Vec<_> = clips.iter().map(|c| c.name()).collect();
+    let names: Vec<_> = clips.iter().map(otio_rs::ClipRef::name).collect();
     assert!(names.contains(&"V1 Clip".to_string()));
     assert!(names.contains(&"A1 Clip 1".to_string()));
     assert!(names.contains(&"A1 Clip 2".to_string()));
@@ -785,9 +790,9 @@ fn test_timeline_json_complex_structure() {
     // Add clips to each
     for i in 0..3 {
         let clip = Clip::new(
-            &format!("V1 Clip {}", i),
+            &format!("V1 Clip {i}"),
             TimeRange::new(
-                RationalTime::new((i * 48) as f64, 24.0),
+                RationalTime::new(f64::from(i * 48), 24.0),
                 RationalTime::new(48.0, 24.0),
             ),
         );
@@ -1088,7 +1093,7 @@ fn test_multiple_clips_range_in_parent() {
     // Add three clips of 24 frames each
     for i in 0..3 {
         let clip = Clip::new(
-            &format!("Clip {}", i),
+            &format!("Clip {i}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
         );
         track.append_clip(clip).unwrap();
@@ -1140,7 +1145,7 @@ fn test_track_remove_at_time() {
     // Add three clips
     for i in 0..3 {
         let clip = Clip::new(
-            &format!("Clip {}", i),
+            &format!("Clip {i}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
         );
         track.append_clip(clip).unwrap();
@@ -1164,7 +1169,7 @@ fn test_track_remove_without_fill() {
     // Add two clips
     for i in 0..2 {
         let clip = Clip::new(
-            &format!("Clip {}", i),
+            &format!("Clip {i}"),
             TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(24.0, 24.0)),
         );
         track.append_clip(clip).unwrap();

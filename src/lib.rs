@@ -334,6 +334,7 @@ impl Timeline {
     ///
     /// Returns `None` if no global start time has been set.
     #[must_use]
+    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn global_start_time(&self) -> Option<RationalTime> {
         let rt = unsafe { ffi::otio_timeline_get_global_start_time(self.ptr) };
         // A zero rate indicates no value was set
@@ -471,7 +472,7 @@ impl Track {
     /// # Errors
     ///
     /// Returns an error if the index is out of bounds.
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     pub fn range_of_child_at_index(&self, index: usize) -> Result<TimeRange> {
         let mut err = macros::ffi_error!();
         let range = unsafe {
@@ -555,7 +556,7 @@ impl Track {
                 self.ptr,
                 clip.ptr,
                 range.into(),
-                if remove_transitions { 1 } else { 0 },
+                i32::from(remove_transitions),
                 &mut err,
             )
         };
@@ -593,7 +594,7 @@ impl Track {
                 self.ptr,
                 clip.ptr,
                 time.into(),
-                if remove_transitions { 1 } else { 0 },
+                i32::from(remove_transitions),
                 &mut err,
             )
         };
@@ -623,7 +624,7 @@ impl Track {
             ffi::otio_track_slice_at_time(
                 self.ptr,
                 time.into(),
-                if remove_transitions { 1 } else { 0 },
+                i32::from(remove_transitions),
                 &mut err,
             )
         };
@@ -650,7 +651,7 @@ impl Track {
             ffi::otio_track_remove_at_time(
                 self.ptr,
                 time.into(),
-                if fill_with_gap { 1 } else { 0 },
+                i32::from(fill_with_gap),
                 &mut err,
             )
         };
@@ -1009,6 +1010,7 @@ impl ExternalReference {
     ///
     /// Returns `None` if no available range has been set.
     #[must_use]
+    #[allow(clippy::float_cmp)] // Sentinel value comparison is intentional
     pub fn available_range(&self) -> Option<TimeRange> {
         let range = unsafe { ffi::otio_external_ref_get_available_range(self.ptr) };
         // Check for zero range (no range set)
@@ -1062,7 +1064,7 @@ impl Stack {
     /// # Errors
     ///
     /// Returns an error if the index is out of bounds.
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     pub fn range_of_child_at_index(&self, index: usize) -> Result<TimeRange> {
         let mut err = macros::ffi_error!();
         let range = unsafe {
