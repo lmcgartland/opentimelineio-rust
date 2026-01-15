@@ -8,7 +8,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-otio-rs = { git = "https://github.com/lukemcgartland/opentimelineio-rust" }
+otio-rs = { git = "https://github.com/lmcgartland/opentimelineio-rust" }
 ```
 
 **Note:** The first build will take several minutes as it compiles the OpenTimelineIO C++ library.
@@ -22,7 +22,7 @@ use std::path::Path;
 fn main() -> otio_rs::Result<()> {
     // Create a timeline
     let mut timeline = Timeline::new("My Project");
-    timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+    timeline.set_global_start_time(RationalTime::new(0.0, 24.0))?;
 
     // Add a video track
     let mut track = timeline.add_video_track("V1");
@@ -86,7 +86,7 @@ use otio_rs::{Timeline, RationalTime};
 use std::path::Path;
 
 let mut timeline = Timeline::new("Project Name");
-timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+timeline.set_global_start_time(RationalTime::new(0.0, 24.0))?;
 
 // Add tracks
 let mut video = timeline.add_video_track("V1");
@@ -138,7 +138,7 @@ media_ref.set_available_range(TimeRange::new(
     RationalTime::new(0.0, 24.0),
     RationalTime::new(1000.0, 24.0),  // 41.6 seconds available
 ));
-clip.set_media_reference(media_ref);
+clip.set_media_reference(media_ref)?;
 
 // Set metadata
 clip.set_metadata("author", "Editor Name");
@@ -190,7 +190,7 @@ stack.append_stack(child_stack)?;
 
 ```rust
 let mut timeline = Timeline::new("Video Project");
-timeline.set_global_start_time(RationalTime::new(0.0, 24.0));
+timeline.set_global_start_time(RationalTime::new(0.0, 24.0))?;
 
 // Video track
 let mut video = timeline.add_video_track("V1");
