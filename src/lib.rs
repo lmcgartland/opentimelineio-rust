@@ -342,6 +342,134 @@ impl Timeline {
         Ok(result)
     }
 
+    /// Write the timeline to a JSON file with schema version targeting.
+    ///
+    /// The `schema_versions` parameter specifies target schema versions for
+    /// downgrading. Pass an empty slice for no downgrading (equivalent to `write_to_file`).
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Output file path
+    /// * `schema_versions` - Slice of (`schema_name`, version) pairs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be written.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otio_rs::Timeline;
+    /// use std::path::Path;
+    ///
+    /// let timeline = Timeline::new("My Timeline");
+    ///
+    /// // Write with Clip schema downgraded to version 1
+    /// timeline.write_to_file_with_schema_versions(
+    ///     Path::new("output.otio"),
+    ///     &[("Clip", 1)]
+    /// ).unwrap();
+    /// ```
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    pub fn write_to_file_with_schema_versions(
+        &self,
+        path: &Path,
+        schema_versions: &[(&str, i64)],
+    ) -> Result<()> {
+        let c_path = CString::new(path.to_string_lossy().as_ref()).unwrap();
+
+        if schema_versions.is_empty() {
+            // No schema versions specified, use regular write
+            let mut err = macros::ffi_error!();
+            let result =
+                unsafe { ffi::otio_timeline_write_to_file(self.ptr, c_path.as_ptr(), &mut err) };
+            return if result != 0 { Err(err.into()) } else { Ok(()) };
+        }
+
+        let names: Vec<CString> = schema_versions
+            .iter()
+            .map(|(name, _)| CString::new(*name).unwrap())
+            .collect();
+        let mut name_ptrs: Vec<*const std::ffi::c_char> =
+            names.iter().map(|s| s.as_ptr()).collect();
+        let versions: Vec<i64> = schema_versions.iter().map(|(_, v)| *v).collect();
+
+        let mut err = macros::ffi_error!();
+        let result = unsafe {
+            ffi::otio_timeline_write_to_file_with_schema_versions(
+                self.ptr,
+                c_path.as_ptr(),
+                name_ptrs.as_mut_ptr(),
+                versions.as_ptr(),
+                schema_versions.len() as i32,
+                &mut err,
+            )
+        };
+        if result != 0 {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Serialize the timeline to a JSON string with schema version targeting.
+    ///
+    /// The `schema_versions` parameter specifies target schema versions for
+    /// downgrading. Pass an empty slice for no downgrading (equivalent to `to_json_string`).
+    ///
+    /// # Arguments
+    ///
+    /// * `schema_versions` - Slice of (`schema_name`, version) pairs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use otio_rs::Timeline;
+    ///
+    /// let timeline = Timeline::new("My Timeline");
+    ///
+    /// // Serialize with Clip schema downgraded to version 1
+    /// let json = timeline.to_json_string_with_schema_versions(&[("Clip", 1)]).unwrap();
+    /// ```
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    pub fn to_json_string_with_schema_versions(
+        &self,
+        schema_versions: &[(&str, i64)],
+    ) -> Result<String> {
+        if schema_versions.is_empty() {
+            return self.to_json_string();
+        }
+
+        let names: Vec<CString> = schema_versions
+            .iter()
+            .map(|(name, _)| CString::new(*name).unwrap())
+            .collect();
+        let mut name_ptrs: Vec<*const std::ffi::c_char> =
+            names.iter().map(|s| s.as_ptr()).collect();
+        let versions: Vec<i64> = schema_versions.iter().map(|(_, v)| *v).collect();
+
+        let mut err = macros::ffi_error!();
+        let ptr = unsafe {
+            ffi::otio_timeline_to_json_string_with_schema_versions(
+                self.ptr,
+                name_ptrs.as_mut_ptr(),
+                versions.as_ptr(),
+                schema_versions.len() as i32,
+                &mut err,
+            )
+        };
+        if ptr.is_null() {
+            return Err(err.into());
+        }
+        let result = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
+        unsafe { ffi::otio_free_string(ptr) };
+        Ok(result)
+    }
+
     /// Deserialize a timeline from a JSON string.
     ///
     /// # Errors

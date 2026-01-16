@@ -27,6 +27,7 @@ This crate provides FFI bindings to the C++ OpenTimelineIO library (v0.17.0) via
 - **Media references** - External references, image sequences, generators, and missing references
 - **Multi-reference clips** - Multiple media references per clip with key-based selection
 - **File I/O** - Read and write `.otio` JSON files
+- **Schema version targeting** - Export with older schema versions for compatibility
 - **Flexible linking** - Use vendored (bundled) or system-installed OpenTimelineIO
 
 ## Prerequisites
@@ -199,6 +200,27 @@ println!("JSON: {}", json);
 // Deserialize from JSON string
 let restored = Timeline::from_json_string(&json)?;
 assert_eq!(restored.name(), "My Timeline");
+```
+
+## Schema Version Targeting
+
+Export timelines with older schema versions for compatibility with older OTIO readers:
+
+```rust
+use otio_rs::Timeline;
+use std::path::Path;
+
+let timeline = Timeline::new("My Timeline");
+// ... add tracks, clips, etc.
+
+// Serialize to JSON string with Clip schema downgraded to version 1
+let json = timeline.to_json_string_with_schema_versions(&[("Clip", 1)])?;
+
+// Or write to file with schema targeting
+timeline.write_to_file_with_schema_versions(
+    Path::new("output.otio"),
+    &[("Clip", 1), ("Timeline", 1)],
+)?;
 ```
 
 ## Image Sequences

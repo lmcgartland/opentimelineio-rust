@@ -970,6 +970,86 @@ OtioTimeline* otio_timeline_from_json_string(const char* json, OtioError* err) {
 }
 
 // ----------------------------------------------------------------------------
+// Serialization with schema version targeting
+// ----------------------------------------------------------------------------
+
+int otio_timeline_write_to_file_with_schema_versions(
+    OtioTimeline* tl,
+    const char* path,
+    const char** schema_names,
+    const int64_t* schema_versions,
+    int32_t count,
+    OtioError* err
+) {
+    OTIO_NULL_CHECK_ERR(tl, err, -1, "Timeline is null");
+    OTIO_NULL_CHECK_ERR(path, err, -1, "Path is null");
+
+    // Build schema version map from arrays
+    otio::schema_version_map version_map;
+    if (schema_names && schema_versions && count > 0) {
+        for (int32_t i = 0; i < count; i++) {
+            if (schema_names[i]) {
+                version_map[schema_names[i]] = schema_versions[i];
+            }
+        }
+    }
+
+    OTIO_TRY_INT(err,
+        OTIO_CAST(Timeline, timeline, tl);
+        otio::ErrorStatus status;
+        bool success = timeline->to_json_file(
+            path,
+            &status,
+            version_map.empty() ? nullptr : &version_map
+        );
+        if (!success || otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return -1;
+        }
+    )
+}
+
+char* otio_timeline_to_json_string_with_schema_versions(
+    OtioTimeline* tl,
+    const char** schema_names,
+    const int64_t* schema_versions,
+    int32_t count,
+    OtioError* err
+) {
+    OTIO_NULL_CHECK_ERR(tl, err, nullptr, "Timeline is null");
+
+    // Build schema version map from arrays
+    otio::schema_version_map version_map;
+    if (schema_names && schema_versions && count > 0) {
+        for (int32_t i = 0; i < count; i++) {
+            if (schema_names[i]) {
+                version_map[schema_names[i]] = schema_versions[i];
+            }
+        }
+    }
+
+    try {
+        auto timeline = reinterpret_cast<otio::Timeline*>(tl);
+        otio::ErrorStatus status;
+        std::string json = timeline->to_json_string(
+            &status,
+            version_map.empty() ? nullptr : &version_map
+        );
+        if (otio::is_error(status)) {
+            set_error(err, 1, status.full_description.c_str());
+            return nullptr;
+        }
+        return safe_strdup(json);
+    } catch (const std::exception& e) {
+        set_error(err, 1, e.what());
+        return nullptr;
+    } catch (...) {
+        set_error(err, 1, "Unknown exception");
+        return nullptr;
+    }
+}
+
+// ----------------------------------------------------------------------------
 // String memory management
 // ----------------------------------------------------------------------------
 

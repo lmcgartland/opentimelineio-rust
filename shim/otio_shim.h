@@ -71,6 +71,25 @@ OtioTimeline* otio_timeline_read_from_file(const char* path, OtioError* err);
 char* otio_timeline_to_json_string(OtioTimeline* tl, OtioError* err);
 OtioTimeline* otio_timeline_from_json_string(const char* json, OtioError* err);
 
+// Serialization with schema version targeting
+// schema_names and schema_versions are parallel arrays of length count
+// Pass count=0 for no downgrading (equivalent to functions above)
+int otio_timeline_write_to_file_with_schema_versions(
+    OtioTimeline* tl,
+    const char* path,
+    const char** schema_names,
+    const int64_t* schema_versions,
+    int32_t count,
+    OtioError* err
+);
+char* otio_timeline_to_json_string_with_schema_versions(
+    OtioTimeline* tl,
+    const char** schema_names,
+    const int64_t* schema_versions,
+    int32_t count,
+    OtioError* err
+);
+
 // Metadata (string key-value pairs)
 // Getter returns malloc'd string - caller must free with otio_free_string
 // Returns NULL if key not found

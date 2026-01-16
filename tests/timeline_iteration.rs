@@ -546,3 +546,80 @@ fn test_neighbors_of_with_mixed_content() {
         panic!("Expected Gap on right of Clip B");
     }
 }
+
+// ============================================================================
+// Schema Version Targeting Tests
+// ============================================================================
+
+#[test]
+fn test_schema_version_downgrade_to_json() {
+    let mut timeline = Timeline::new("Schema Test");
+    let mut track = timeline.add_video_track("V1");
+
+    let range = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0));
+    let mut clip = Clip::new("Test Clip", range);
+    let ext_ref = ExternalReference::new("/path/to/media.mov");
+    clip.set_media_reference(ext_ref).unwrap();
+    track.append_clip(clip).unwrap();
+
+    // Export with Clip schema downgraded to version 1
+    let json = timeline
+        .to_json_string_with_schema_versions(&[("Clip", 1)])
+        .unwrap();
+
+    // Verify it contains Clip.1 schema (not Clip.2)
+    assert!(
+        json.contains("\"OTIO_SCHEMA\": \"Clip.1\""),
+        "Expected Clip.1 schema in output"
+    );
+    // Clip.1 uses "media_reference" (singular), not "media_references" (plural dict)
+    assert!(
+        json.contains("\"media_reference\":"),
+        "Expected media_reference field in Clip.1 schema"
+    );
+}
+
+#[test]
+fn test_schema_version_empty_slice() {
+    let timeline1 = Timeline::new("Empty Schema Test");
+    let timeline2 = Timeline::new("Empty Schema Test");
+
+    // Empty slice should produce the same output as regular to_json_string
+    let json_with_empty = timeline1.to_json_string_with_schema_versions(&[]).unwrap();
+    let json_normal = timeline2.to_json_string().unwrap();
+
+    // Both should produce valid JSON (may have minor differences due to formatting)
+    assert!(json_with_empty.contains("\"OTIO_SCHEMA\": \"Timeline.1\""));
+    assert!(json_normal.contains("\"OTIO_SCHEMA\": \"Timeline.1\""));
+}
+
+#[test]
+fn test_schema_version_write_to_file() {
+    let mut timeline = Timeline::new("File Write Test");
+    let mut track = timeline.add_video_track("V1");
+
+    let range = TimeRange::new(RationalTime::new(0.0, 24.0), RationalTime::new(48.0, 24.0));
+    let mut clip = Clip::new("Test Clip", range);
+    let ext_ref = ExternalReference::new("/path/to/media.mov");
+    clip.set_media_reference(ext_ref).unwrap();
+    track.append_clip(clip).unwrap();
+
+    // Create a temp file path
+    let temp_dir = std::env::temp_dir();
+    let path = temp_dir.join("schema_test.otio");
+
+    // Write with schema version targeting
+    timeline
+        .write_to_file_with_schema_versions(&path, &[("Clip", 1)])
+        .unwrap();
+
+    // Read back and verify
+    let json = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        json.contains("\"OTIO_SCHEMA\": \"Clip.1\""),
+        "Expected Clip.1 schema in file"
+    );
+
+    // Clean up
+    let _ = std::fs::remove_file(&path);
+}
