@@ -2258,6 +2258,24 @@ OtioTimeRange otio_external_ref_get_available_range(OtioExternalRef* ref) {
     }
 }
 
+char* otio_external_ref_get_name(OtioExternalRef* ref) {
+    OTIO_NULL_CHECK(ref, nullptr);
+    OTIO_TRY_PTR(
+        auto typed = reinterpret_cast<otio::ExternalReference*>(ref);
+        return safe_strdup(typed->name());
+    )
+}
+
+void otio_external_ref_set_name(OtioExternalRef* ref, const char* name) {
+    if (!ref || !name) return;
+    try {
+        auto typed = reinterpret_cast<otio::ExternalReference*>(ref);
+        typed->set_name(std::string(name));
+    } catch (...) {
+        // Ignore exceptions
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Timeline additional accessors
 // ----------------------------------------------------------------------------

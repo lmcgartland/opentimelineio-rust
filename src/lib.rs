@@ -1484,6 +1484,19 @@ impl ExternalReference {
         Self { ptr }
     }
 
+    /// Get the name of this external reference.
+    #[must_use]
+    pub fn name(&self) -> String {
+        let ptr = unsafe { ffi::otio_external_ref_get_name(self.ptr) };
+        ffi_string_to_rust(ptr)
+    }
+
+    /// Set the name of this external reference.
+    pub fn set_name(&mut self, name: &str) {
+        let c_name = CString::new(name).unwrap();
+        unsafe { ffi::otio_external_ref_set_name(self.ptr, c_name.as_ptr()) };
+    }
+
     /// Set the available range for this media reference.
     ///
     /// # Errors

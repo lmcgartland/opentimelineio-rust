@@ -403,6 +403,24 @@ fn test_external_ref_available_range() {
     assert_eq!(retrieved.duration.value, 1000.0);
 }
 
+#[test]
+fn test_external_ref_name() {
+    // New references have empty name by default
+    let ext_ref = ExternalReference::new("/path/to/video.mov");
+    assert!(ext_ref.name().is_empty());
+}
+
+#[test]
+fn test_external_ref_set_name() {
+    let mut ext_ref = ExternalReference::new("/path/to/video.mov");
+    ext_ref.set_name("My Media Reference");
+    assert_eq!(ext_ref.name(), "My Media Reference");
+
+    // Test updating name
+    ext_ref.set_name("Updated Name");
+    assert_eq!(ext_ref.name(), "Updated Name");
+}
+
 // ============================================================================
 // Integration tests
 // ============================================================================

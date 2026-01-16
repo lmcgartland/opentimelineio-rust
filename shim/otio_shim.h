@@ -443,6 +443,8 @@ OtioTimeRange otio_stack_trimmed_range(OtioStack* stack, OtioError* err);
 
 char* otio_external_ref_get_target_url(OtioExternalRef* ref);
 OtioTimeRange otio_external_ref_get_available_range(OtioExternalRef* ref);
+char* otio_external_ref_get_name(OtioExternalRef* ref);
+void otio_external_ref_set_name(OtioExternalRef* ref, const char* name);
 
 // ----------------------------------------------------------------------------
 // Timeline additional accessors
